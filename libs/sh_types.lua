@@ -2,7 +2,8 @@
 	sh_types.lua — Les types d'infraction, les bornes et la formule d'état d'un dossier, partagés.
 
 	Rien de ce qui se déduit n'est stocké : l'état se recalcule des deux côtés avec `Etat`, à l'instant voulu.
-	Helix inclut libs/ AVANT sh_plugin.lua : le global se crée ici, premier fichier sh_ par ordre alphabétique.
+	Helix inclut libs/ AVANT sh_plugin.lua, par ordre alphabétique : chaque fichier qui lit le global au
+	chargement le crée s'il manque.
 --]]
 
 VALDERAAN = VALDERAAN or {}
@@ -59,6 +60,12 @@ Sanctions.CHAMPS_MODIFIABLES = {"type", "texte", "sanction", "jours"}
 
 ---@alias SanctionEtat "annule"|"avertissement"|"leve"|"banni"|"banni_jusqu"|"termine"
 
+--- Un compte Steam individuel : l'aller-retour par le SteamID écarte tout nombre hors de la plage des comptes.
+function Sanctions.EstSteamID64(valeur)
+	return isstring(valeur) and #valeur == 17 and valeur:match("^7656119%d+$") != nil
+		and util.SteamIDTo64(util.SteamIDFrom64(valeur)) == valeur
+end
+
 function Sanctions.EstType(id)
 	return LIBELLES[id] != nil
 end
@@ -93,7 +100,9 @@ function Sanctions.Etat(dossier, maintenant)
 
 	local echeance = Sanctions.Echeance(dossier)
 
-	if (echeance > maintenant) then
+	if (!echeance) then
+		return "termine"
+	elseif (echeance > maintenant) then
 		return "banni_jusqu", echeance
 	end
 

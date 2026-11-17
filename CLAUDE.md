@@ -11,7 +11,11 @@ l'archi et l'état. Spec : `docs/dev/specs/2026-11-17-sanctions-design.md` ; rep
   le lève, et rattrape dans un dossier tout `!ban` / `!unban` tapé hors de l'interface.
 - **On ne supprime jamais une ligne.** Un dossier s'annule ; toute écriture d'un dossier écrit son entrée de journal,
   par une seule fonction serveur.
-- **Un seul droit**, l'accès ULX `ulx sanctions`, lu par `CAMI.PlayerHasAccess`.
+- **Un seul droit**, l'accès ULX `ulx sanctions`, lu par `CAMI.PlayerHasAccess` dans `Sanctions.PeutGerer`.
+- **Le menu C ne passe pas par `CanProperty`** : Helix n'y laisse que les admins, son plugin `propprotect` y refuse
+  toute entité qu'on ne possède pas (un joueur compris), et l'ordre des méthodes de plugin n'est pas garanti.
+- **Un dossier né d'un rattrapage ne réécrit pas ULib** : il garde le motif et l'auteur d'ULX, et son `debut` recule
+  pour que l'échéance en jours entiers tombe sur celle d'ULib.
 - **L'état ne se stocke pas** : `Sanctions.Etat(dossier, maintenant)` le recalcule des deux côtés.
 
 ## Structure
@@ -19,14 +23,16 @@ l'archi et l'état. Spec : `docs/dev/specs/2026-11-17-sanctions-design.md` ; rep
 | Fichier | Rôle |
 |---|---|
 | `sh_plugin.lua` | déclaration |
-| `libs/sh_types.lua` | le global `VALDERAAN.Sanctions`, types d'infraction (ids persistés), bornes, `Etat`, `Libelle` |
+| `libs/sh_commande.lua` | `Sanctions.PeutGerer` (seul lecteur du droit, des deux côtés), commande `!sanctions`, `ResoudreCible`, entrée `sanctions` du menu C |
+| `libs/sh_types.lua` | types d'infraction (ids persistés), bornes, `Etat`, `Libelle`, `EstSteamID64`, noms des canaux |
 | `libs/sv_base.lua` | tables `val_sanctions` et `val_sanctions_journal`, `Sanctions.Ecrire` (seule écriture, journal compris), `Creer`, `Modifier`, `Annuler`, `Lever`, `Lire`, `Dossier` |
 | `libs/sv_ulib.lua` | `Sanctions.Appliquer` (seul appelant de `ULib.addBan` / `unban`, sous garde), rattrapage des ban / unban hors interface, remplacement de l'actif |
-| `libs/sv_net.lua` | `Sanctions.PeutGerer` (seul lecteur du droit), `Recevoir` (débit, droit, forme, puis `sv_base`), `Repondre` ; canaux dans `Sanctions.NET` |
+| `libs/sv_net.lua` | `Sanctions.Recevoir` (débit, droit, forme, puis `sv_base`), `Repondre` ; canaux dans `Sanctions.NET` |
 | `banc/etat.lua` | la formule d'état sur des dossiers factices |
 | `banc/base.lua` | dossiers et journal sur un faux compte |
 | `banc/ulib.lua` | application, remplacement et rattrapage sur des faux comptes |
 | `banc/refus.lua` | refus de la porte réseau : droit, bornes, débit, `Mien` |
+| `banc/cible.lua` | résolution de cible de `!sanctions`, filtre du menu C, inscription ULX |
 
 ## Modèle de données
 
@@ -41,4 +47,4 @@ n'a jamais d'accès ULib (garde de `schema/libs/sv_banc_bot.lua`) : un scénario
 
 ## État
 
-Chantier en cours (tâche 4 sur 10). Toutes les bornes sont des placeholders.
+Chantier en cours (tâche 5 sur 10). Toutes les bornes sont des placeholders.

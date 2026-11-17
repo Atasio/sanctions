@@ -99,9 +99,11 @@ return {
 		ULib.addBan(sid(4), 90, "Motif direct", "Joueur du banc", "Modo(STEAM_0:1:12345)")
 		Banc.Attendre(0.5)
 		local rattrape = dossiers(4)[1]
+		entree = ULib.bans[sid(4)]
 
 		Banc.Verifier(5, rattrape and rattrape.type == "autre" and rattrape.sanction == "temporaire" and rattrape.jours == 1
-			and rattrape.texte == "Motif direct" and rattrape.auteur_steamid64 == util.SteamIDTo64("STEAM_0:1:12345"),
+			and rattrape.texte == "Motif direct" and rattrape.auteur_steamid64 == util.SteamIDTo64("STEAM_0:1:12345")
+			and entree and entree.reason == "Motif direct" and Sanctions.Echeance(rattrape) == entree.unban,
 			"ban direct de 90 min : dossier autre de 1 j (" .. (rattrape and (rattrape.sanction .. ", " .. tostring(rattrape.jours) .. " j, " .. rattrape.auteur_nom) or "aucun") .. ")")
 
 		ULib.unban(sid(1))

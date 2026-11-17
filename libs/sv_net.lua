@@ -18,15 +18,6 @@ local ECRITURES = {Creer = true, Modifier = true, Annuler = true}
 local INTERVALLE_ECRITURE = 1
 local INTERVALLE_LECTURE = 0.5
 
---- Le seul lecteur du droit du plugin. `nil` est la console ; tout joueur invalide est refusé.
----@param client Player?
-function Sanctions.PeutGerer(client)
-	if (client == nil) then return true end
-	if (!IsValid(client) or !client:IsPlayer() or !CAMI) then return false end
-
-	return CAMI.PlayerHasAccess(client, "ulx sanctions") == true
-end
-
 local derniers = {}
 
 local function debit(client, ecriture)
@@ -48,10 +39,6 @@ end
 hook.Add("PlayerDisconnected", "sanctionsDebit", function(client)
 	derniers[client] = nil
 end)
-
-local function estSteamID64(valeur)
-	return isstring(valeur) and #valeur == 17 and valeur:match("^%d+$") != nil
-end
 
 local function erreurTexte(texte)
 	if (!isstring(texte)) then return "Texte manquant." end
@@ -120,6 +107,11 @@ function Sanctions.Repondre(client, genre, contenu)
 
 	local compresse = util.Compress(util.TableToJSON(contenu))
 
+	-- PLACEHOLDER, sous la limite de 64 Ko d'un message.
+	if (#compresse > 60000) then
+		return Sanctions.Repondre(client, "refus", "Dossier trop volumineux pour être envoyé.")
+	end
+
 	envoyer(client, NET.dossier, function()
 		net.WriteUInt(#compresse, 32)
 		net.WriteData(compresse, #compresse)
@@ -135,8 +127,19 @@ local function envoyerDossier(client, steamid64)
 	Sanctions.Dossier(steamid64, function(complet)
 		if (!IsValid(client)) then return end
 
+		local peutGerer = Sanctions.PeutGerer(client)
+
+		-- Le joueur lit le nom du modérateur, jamais son SteamID.
 		for _, dossier in ipairs(complet.dossiers) do
 			dossier.journal = complet.journal[dossier.id] or {}
+
+			if (!peutGerer) then
+				dossier.auteur_steamid64 = nil
+
+				for _, entree in ipairs(dossier.journal) do
+					entree.auteur_steamid64 = nil
+				end
+			end
 		end
 
 		local joueur = player.GetBySteamID64(steamid64)
@@ -146,13 +149,14 @@ local function envoyerDossier(client, steamid64)
 			nomSteam = IsValid(joueur) and joueur:SteamName() or nil,
 			dossiers = complet.dossiers,
 			personnages = complet.personnages,
-			peutGerer = Sanctions.PeutGerer(client)
+			peutGerer = peutGerer
 		})
 	end)
 end
 
 local function apresEcriture(client, dossier, raison)
-	if (!dossier) then return refuser(client, raison) end
+	if (raison) then refuser(client, raison) end
+	if (!dossier) then return end
 
 	envoyerDossier(client, dossier.steamid64)
 end
@@ -181,11 +185,11 @@ function Sanctions.Recevoir(client, action, intention)
 	local acteur = Sanctions.Acteur(client)
 
 	if (action == "Ouvrir") then
-		if (!estSteamID64(intention.steamid64)) then return refuser(client, "Compte invalide.") end
+		if (!Sanctions.EstSteamID64(intention.steamid64)) then return refuser(client, "Compte invalide.") end
 
 		envoyerDossier(client, intention.steamid64)
 	elseif (action == "Creer") then
-		if (!estSteamID64(intention.steamid64)) then return refuser(client, "Compte invalide.") end
+		if (!Sanctions.EstSteamID64(intention.steamid64)) then return refuser(client, "Compte invalide.") end
 
 		local champs, raison = valider(intention, true)
 

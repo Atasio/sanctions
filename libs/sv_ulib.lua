@@ -17,12 +17,19 @@ end
 -- sans la garde, chaque bannissement posé par le plugin se rattraperait en un second dossier.
 local garde = false
 
+-- Un dossier né d'un rattrapage a déjà son entrée ULib : la réécrire effacerait le motif et l'auteur d'ULX.
+local rattrapes = {}
+
 local function sousGarde(appel, ...)
 	garde = true
 	local ok, erreur = pcall(appel, ...)
 	garde = false
 
-	if (!ok) then ErrorNoHalt("[Sanctions] " .. tostring(erreur) .. "\n") end
+	if (!ok) then
+		ErrorNoHalt("[Sanctions] " .. tostring(erreur) .. "\n")
+
+		return "Dossier écrit, mais ULib a échoué : vérifiez le bannissement."
+	end
 end
 
 local function motif(dossier)
@@ -57,25 +64,26 @@ end
 ---@param acteur SanctionActeur
 ---@param avant SanctionDossier?
 ---@param dossier SanctionDossier
----@param callback fun()
+---@param callback fun(erreur: string?)
 function Sanctions.Appliquer(acteur, avant, dossier, callback)
 	local maintenant = os.time()
 	local steamid = util.SteamIDFrom64(dossier.steamid64)
 
 	if (Sanctions.BannitEncore(dossier, maintenant)) then
 		remplacer(acteur, dossier, function()
+			if (rattrapes[dossier.steamid64]) then return callback() end
+
 			local echeance = Sanctions.Echeance(dossier)
 			local minutes = echeance and math.max(1, math.ceil((echeance - maintenant) / 60)) or 0
 
-			sousGarde(ULib.addBan, steamid, minutes, motif(dossier), dossier.perso_nom, acteur.nom)
-			callback()
+			callback(sousGarde(ULib.addBan, steamid, minutes, motif(dossier), dossier.perso_nom, acteur.nom))
 		end)
 
 		return
 	end
 
 	if (avant and Sanctions.BannitEncore(avant, maintenant) and ULib.bans[steamid]) then
-		sousGarde(ULib.unban, steamid)
+		return callback(sousGarde(ULib.unban, steamid))
 	end
 
 	callback()
@@ -107,7 +115,11 @@ hook.Add(ULib.HOOK_USER_BANNED, "sanctionsRattrapage", function(steamid, entree)
 
 	local texte = isstring(entree.reason) and entree.reason != "" and entree.reason or "(ban ULX sans motif)"
 
-	if ((utf8.len(texte) or 0) > Sanctions.TEXTE_MAX) then
+	local longueur = utf8.len(texte)
+
+	if (!longueur) then
+		texte = texte:sub(1, Sanctions.TEXTE_MAX)
+	elseif (longueur > Sanctions.TEXTE_MAX) then
 		texte = texte:sub(1, utf8.offset(texte, Sanctions.TEXTE_MAX + 1) - 1)
 	end
 
@@ -117,9 +129,16 @@ hook.Add(ULib.HOOK_USER_BANNED, "sanctionsRattrapage", function(steamid, entree)
 	if (unban > 0) then
 		champs.sanction = "temporaire"
 		champs.jours = math.Clamp(math.ceil((unban - os.time()) / Sanctions.JOUR), Sanctions.JOURS_MIN, Sanctions.JOURS_MAX)
+		-- Les jours sont entiers, pas la durée d'ULX : le début recule pour que l'échéance tombe sur la sienne.
+		champs.debut = unban - champs.jours * Sanctions.JOUR
 	end
 
-	Sanctions.Creer(acteurULib(entree.modified_admin or entree.admin), util.SteamIDTo64(steamid), champs)
+	local steamid64 = util.SteamIDTo64(steamid)
+
+	rattrapes[steamid64] = true
+	Sanctions.Creer(acteurULib(entree.modified_admin or entree.admin), steamid64, champs, function()
+		rattrapes[steamid64] = nil
+	end)
 end)
 
 hook.Add(ULib.HOOK_USER_UNBANNED, "sanctionsRattrapage", function(steamid, admin)

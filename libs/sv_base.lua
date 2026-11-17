@@ -121,8 +121,9 @@ local function appliquer(acteur, action, avant, dossier, callback)
 		return callback(dossier)
 	end
 
-	Sanctions.Appliquer(acteur, avant, dossier, function()
-		callback(dossier)
+	-- Le dossier est écrit même si ULib échoue : la raison remonte à l'appelant avec lui.
+	Sanctions.Appliquer(acteur, avant, dossier, function(erreur)
+		callback(dossier, erreur)
 	end)
 end
 
