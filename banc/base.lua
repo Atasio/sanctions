@@ -26,9 +26,17 @@ return {
 		end
 
 		Banc.Defaire(function()
-			local query = mysql:Delete("val_sanctions")
-				query:Where("steamid64", CIBLE)
-			query:Execute()
+			Sanctions.DossiersDe(CIBLE, function(dossiers)
+				for _, dossier in ipairs(dossiers) do
+					local query = mysql:Delete("val_sanctions_journal")
+						query:Where("sanction_id", dossier.id)
+					query:Execute()
+				end
+
+				local query = mysql:Delete("val_sanctions")
+					query:Where("steamid64", CIBLE)
+				query:Execute()
+			end)
 		end)
 
 		local perso = mysql:Insert("ix_characters")

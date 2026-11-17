@@ -113,6 +113,19 @@ local function journaliser(acteur, action, sanctionID, avant, apres, callback)
 	query:Execute()
 end
 
+-- Une levée ou un remplacement suit ULib (rattrapage) ou lui laisse l'entrée du dossier suivant : rien à appliquer.
+local APPLIQUE = {creation = true, modification = true, annulation = true}
+
+local function appliquer(acteur, action, avant, dossier, callback)
+	if (!APPLIQUE[action] or !Sanctions.Appliquer) then
+		return callback(dossier)
+	end
+
+	Sanctions.Appliquer(acteur, avant, dossier, function()
+		callback(dossier)
+	end)
+end
+
 --- La seule écriture des deux tables. `avant` nil : création, `champs` est la ligne entière.
 --- Sinon `champs` ne porte que ce qui change ; `note` s'ajoute à l'`apres` du journal (ex. `remplace_par`).
 ---@param acteur SanctionActeur
@@ -136,7 +149,7 @@ function Sanctions.Ecrire(acteur, action, avant, champs, callback, note)
 			dossier.id = id
 
 			journaliser(acteur, action, id, nil, nil, function()
-				callback(dossier)
+				appliquer(acteur, action, nil, dossier, callback)
 			end)
 		end)
 		query:Execute()
@@ -171,7 +184,7 @@ function Sanctions.Ecrire(acteur, action, avant, champs, callback, note)
 		if (dossier.jours == false) then dossier.jours = nil end
 
 		journaliser(acteur, action, avant.id, diffAvant, table.Merge(diffApres, note or {}), function()
-			callback(dossier)
+			appliquer(acteur, action, avant, dossier, callback)
 		end)
 	end)
 	query:Execute()
