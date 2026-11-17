@@ -36,6 +36,11 @@ Sanctions.JOURS_MAX = 3650
 
 Sanctions.JOUR = 86400
 
+Sanctions.NET = {agir = "sanctionsAgir", dossier = "sanctionsDossier", refus = "sanctionsRefus"}
+
+-- Les champs que `Modifier` envoie, dans l'ordre du message ; chacun précédé d'un booléen « présent ».
+Sanctions.CHAMPS_MODIFIABLES = {"type", "texte", "sanction", "jours"}
+
 ---@class SanctionDossier
 ---@field id integer
 ---@field steamid64 string

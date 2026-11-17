@@ -22,9 +22,11 @@ l'archi et l'état. Spec : `docs/dev/specs/2026-11-17-sanctions-design.md` ; rep
 | `libs/sh_types.lua` | le global `VALDERAAN.Sanctions`, types d'infraction (ids persistés), bornes, `Etat`, `Libelle` |
 | `libs/sv_base.lua` | tables `val_sanctions` et `val_sanctions_journal`, `Sanctions.Ecrire` (seule écriture, journal compris), `Creer`, `Modifier`, `Annuler`, `Lever`, `Lire`, `Dossier` |
 | `libs/sv_ulib.lua` | `Sanctions.Appliquer` (seul appelant de `ULib.addBan` / `unban`, sous garde), rattrapage des ban / unban hors interface, remplacement de l'actif |
+| `libs/sv_net.lua` | `Sanctions.PeutGerer` (seul lecteur du droit), `Recevoir` (débit, droit, forme, puis `sv_base`), `Repondre` ; canaux dans `Sanctions.NET` |
 | `banc/etat.lua` | la formule d'état sur des dossiers factices |
 | `banc/base.lua` | dossiers et journal sur un faux compte |
 | `banc/ulib.lua` | application, remplacement et rattrapage sur des faux comptes |
+| `banc/refus.lua` | refus de la porte réseau : droit, bornes, débit, `Mien` |
 
 ## Modèle de données
 
@@ -33,8 +35,10 @@ L'enveloppe `mysql` de Helix met toute valeur entre guillemets : **aucun NULL**.
 `pairs`). Le journal ne stocke que le diff (`avant` / `apres` en JSON) ; une création n'en porte pas.
 
 Un faux compte de banc se bâtit d'un `STEAM_0:x:y` (`util.SteamIDTo64`) : un SteamID64 sous la base Steam
-(`76561197960265728`) ne survit pas à l'aller-retour `SteamIDFrom64` → `SteamIDTo64` que fait le rattrapage.
+(`76561197960265728`) ne survit pas à l'aller-retour `SteamIDFrom64` → `SteamIDTo64` que fait le rattrapage. Et un bot
+n'a jamais d'accès ULib (garde de `schema/libs/sv_banc_bot.lua`) : un scénario donne le droit en remplaçant
+`Sanctions.PeutGerer`, et lit les réponses en remplaçant `Sanctions.Repondre`.
 
 ## État
 
-Chantier en cours (tâche 3 sur 10). Toutes les bornes sont des placeholders.
+Chantier en cours (tâche 4 sur 10). Toutes les bornes sont des placeholders.
