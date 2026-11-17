@@ -1,0 +1,105 @@
+--[[
+	sh_types.lua — Les types d'infraction, les bornes et la formule d'état d'un dossier, partagés.
+
+	Rien de ce qui se déduit n'est stocké : l'état se recalcule des deux côtés avec `Etat`, à l'instant voulu.
+	Helix inclut libs/ AVANT sh_plugin.lua : le global se crée ici, premier fichier sh_ par ordre alphabétique.
+--]]
+
+VALDERAAN = VALDERAAN or {}
+VALDERAAN.Sanctions = VALDERAAN.Sanctions or {}
+
+local Sanctions = VALDERAAN.Sanctions
+
+-- ⚠️ Un id est persisté en base : il ne se renomme plus. Le libellé se retouche librement. NON-CANON.
+Sanctions.TYPES = {
+	{id = "hrp_vocal", libelle = "HRP vocal"},
+	{id = "metagaming", libelle = "Metagaming"},
+	{id = "insulte", libelle = "Insulte ou offense personnelle"},
+	{id = "glitch_exploit", libelle = "Glitch / exploit"},
+	{id = "freekill", libelle = "Freekill"},
+	{id = "autre", libelle = "Autre"}
+}
+
+local LIBELLES = {}
+
+for _, infraction in ipairs(Sanctions.TYPES) do
+	LIBELLES[infraction.id] = infraction.libelle
+end
+
+---@alias SanctionKind "aucune"|"temporaire"|"definitive"
+Sanctions.SANCTION = {aucune = true, temporaire = true, definitive = true}
+
+-- PLACEHOLDERS.
+Sanctions.TEXTE_MAX = 1000
+Sanctions.JOURS_MIN = 1
+Sanctions.JOURS_MAX = 3650
+
+Sanctions.JOUR = 86400
+
+---@class SanctionDossier
+---@field id integer
+---@field steamid64 string
+---@field type string
+---@field texte string
+---@field sanction SanctionKind
+---@field jours integer?
+---@field debut integer
+---@field levee_le integer?
+---@field auteur_steamid64 string
+---@field auteur_nom string
+---@field perso_id integer?
+---@field perso_nom string?
+---@field cree_le integer
+---@field annulee boolean
+
+---@alias SanctionEtat "annule"|"avertissement"|"leve"|"banni"|"banni_jusqu"|"termine"
+
+function Sanctions.EstType(id)
+	return LIBELLES[id] != nil
+end
+
+--- Un type retiré du code laisse des dossiers en base : ils s'affichent « Autre ».
+function Sanctions.Libelle(id)
+	return LIBELLES[id] or LIBELLES.autre
+end
+
+---@param dossier SanctionDossier
+---@return integer?
+function Sanctions.Echeance(dossier)
+	if (dossier.sanction != "temporaire") then return end
+
+	return dossier.debut + (dossier.jours or 0) * Sanctions.JOUR
+end
+
+---@param dossier SanctionDossier
+---@param maintenant integer
+---@return SanctionEtat etat
+---@return integer? echeance pour `banni_jusqu`
+function Sanctions.Etat(dossier, maintenant)
+	if (dossier.annulee) then
+		return "annule"
+	elseif (dossier.sanction == "aucune") then
+		return "avertissement"
+	elseif (dossier.levee_le) then
+		return "leve"
+	elseif (dossier.sanction == "definitive") then
+		return "banni"
+	end
+
+	local echeance = Sanctions.Echeance(dossier)
+
+	if (echeance > maintenant) then
+		return "banni_jusqu", echeance
+	end
+
+	return "termine"
+end
+
+--- Vrai tant que le dossier tient un bannissement en vigueur : c'est lui que pilote ULib.
+---@param dossier SanctionDossier
+---@param maintenant integer
+function Sanctions.BannitEncore(dossier, maintenant)
+	local etat = Sanctions.Etat(dossier, maintenant)
+
+	return etat == "banni" or etat == "banni_jusqu"
+end
