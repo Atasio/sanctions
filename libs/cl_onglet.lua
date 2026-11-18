@@ -31,12 +31,11 @@ local function styleScroll(scroll)
 	end
 end
 
-local function ligneTexte(parent, texte, role, hauteur, marge)
+local function ligneTexte(parent, texte, role, hauteur)
 	local panel = parent:Add("Panel")
 
 	panel:Dock(TOP)
 	panel:SetTall(K.Scale(hauteur))
-	panel:DockMargin(0, K.Scale(marge), 0, 0)
 
 	function panel:Paint(width, height)
 		draw.SimpleText(texte, K.Role(role), 0, height / 2, theme().col.text3, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
@@ -62,11 +61,10 @@ local function remplir(page, dossiers, options)
 	page.corps:Clear()
 
 	if (#dossiers == 0) then
-		return ligneTexte(page.corps, "Aucune sanction", "value", 32, 0)
+		return ligneTexte(page.corps, "Aucune sanction", "value", 32)
 	end
 
 	Sanctions.Liste(page.corps, dossiers, options)
-	ligneTexte(page.corps, "Une sanction se conteste auprès du staff, sur Discord.", "small", 28, 24)
 end
 
 VALDERAAN.Menu.Register({
@@ -75,7 +73,7 @@ VALDERAAN.Menu.Register({
 		local page = construire(container)
 
 		page.attente = true
-		ligneTexte(page.corps, "Lecture du dossier…", "small", 28, 0)
+		ligneTexte(page.corps, "Lecture du dossier…", "small", 28)
 
 		hook.Add("SanctionsDossier", page, function(self, recu)
 			if (recu.steamid64 == LocalPlayer():SteamID64()) then
@@ -90,7 +88,7 @@ VALDERAAN.Menu.Register({
 
 			self.attente = false
 			self.corps:Clear()
-			ligneTexte(self.corps, raison, "small", 28, 0)
+			ligneTexte(self.corps, raison, "small", 28)
 
 			return true
 		end)
