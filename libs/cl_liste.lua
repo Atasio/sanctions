@@ -203,6 +203,12 @@ local function paintLigne(row, width, height)
 	local texte = style.barre_texte and col.text3 or col.textNotes
 
 	Sanctions.PoserEspace(row.titreEspace, K.Role("heading"), gauche, S(24), titre)
+
+	if (row.compteCourt) then
+		draw.SimpleText(row.compteCourt, K.Role("small"), gauche + row.largeurTitre + S(14), S(24),
+			style.eteint and col.text3 or col.text1, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+	end
+
 	draw.SimpleText(row.texteCourt or "", K.Role("smallIt"), gauche, S(50), texte, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 	Sanctions.PoserEspace(row.libelleEtat, K.Role("micro"), droite, S(23), col[style.encre], true)
 	draw.SimpleText(row.date, K.Role("small"), droite, S(50), texte, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
@@ -214,13 +220,20 @@ local function paintLigne(row, width, height)
 end
 
 local function layoutLigne(row, width)
-	local largeur = math.min(K.Scale(row.actions and 380 or 520), width - row.marge - K.Scale(200))
+	local largeur = math.min(K.Scale(row.actions and 380 or (row.compte and 540 or 520)), width - row.marge - K.Scale(200))
 
 	row.texteCourt = K.Fit(string.gsub(row.dossier.texte or "", "%s+", " "), K.Role("smallIt"), largeur)
 	surface.SetFont(K.Role("smallIt"))
 	row.largeurTexte = surface.GetTextSize(row.texteCourt)
 	row.titreEspace = Sanctions.Espacer(row.titre, K.Role("heading"), 1)
 	row.largeurTitre = row.titreEspace.width
+
+	if (row.compte) then
+		local dossier = row.dossier
+		local nom = (dossier.perso_nom and dossier.perso_nom != "") and dossier.perso_nom or dossier.steamid64
+
+		row.compteCourt = K.Fit(nom, K.Role("small"), math.max(K.Scale(40), width - row.marge - K.Scale(240) - row.largeurTitre))
+	end
 end
 
 local function paintDepli(depli, width, height)
@@ -305,6 +318,8 @@ end
 ---@field actions boolean?               « Modifier » / « Annuler » par ligne (staff)
 ---@field OnModifier fun(dossier: SanctionDossier)?
 ---@field OnAnnuler fun(dossier: SanctionDossier)?
+---@field compte boolean?                le compte visé après le type d'infraction (journal général)
+---@field clic fun(dossier: SanctionDossier)?  remplace le dépli : un clic remonte le dossier
 ---@field deplie integer?                id du dossier ouvert d'emblée
 ---@field survol integer?                rang d'une ligne peinte survolée (vue de capture : la souris en est écartée)
 
@@ -342,7 +357,7 @@ function Sanctions.Liste(parent, dossiers, options)
 
 	for rang, dossier in ipairs(dossiers) do
 		local row = liste:Add("DButton")
-		local depli = liste:Add("Panel")
+		local depli = !options.clic and liste:Add("Panel")
 
 		row:SetText("")
 		row:Dock(TOP)
@@ -352,6 +367,7 @@ function Sanctions.Liste(parent, dossiers, options)
 		row.date = Sanctions.DateLongue(dossier.cree_le or dossier.debut or 0) .. " · " .. (dossier.auteur_nom or "?")
 		row.marge = K.Scale(16)
 		row.actions = options.actions
+		row.compte = options.compte
 		row.survolForce = options.survol == rang
 		row.deplie = options.deplie == dossier.id
 		row.Paint = paintLigne
@@ -361,14 +377,20 @@ function Sanctions.Liste(parent, dossiers, options)
 			ajouterActions(row, options)
 		end
 
-		depli:Dock(TOP)
-		depli.texte = dossier.texte or ""
-		depli.entrees = entreesJournal(dossier)
-		depli.Paint = paintDepli
-		depli.PerformLayout = layoutDepli
-		depli:SetVisible(row.deplie)
+		if (depli) then
+			depli:Dock(TOP)
+			depli.texte = dossier.texte or ""
+			depli.entrees = entreesJournal(dossier)
+			depli.Paint = paintDepli
+			depli.PerformLayout = layoutDepli
+			depli:SetVisible(row.deplie)
+		end
 
 		function row:DoClick()
+			if (!depli) then
+				return options.clic(dossier)
+			end
+
 			self.deplie = !self.deplie
 			depli:SetVisible(self.deplie)
 			liste:InvalidateLayout()
