@@ -49,5 +49,18 @@ return {
 		-- PeutGerer est remplacé dans ce scénario : seul ce constat voit le privilège que lit le vrai, côté CAMI.
 		Banc.Verifier(3, inscrite and ULib.ucl.accessStrings["ulx sanctions"] != nil and CAMI.GetPrivilege("ulx sanctions") != nil,
 			"!sanctions inscrite dans ULX, accès enregistré dans ULX et CAMI")
+
+		-- La commande vide ouvre le journal sans résoudre de cible.
+		local recu = {}
+		local repondre = Sanctions.Repondre
+
+		Sanctions.Repondre = function(_, genre) recu[#recu + 1] = genre end
+		Banc.Defaire(function() Sanctions.Repondre = repondre end)
+
+		Sanctions.Commande(modo, "")
+		Sanctions.Commande(modo, "   ")
+
+		Banc.Verifier(4, table.concat(recu, ",") == "ouvrir,ouvrir" and Sanctions.NET.ouvrir == "sanctionsOuvrir",
+			"commande vide puis blanche : le journal s'ouvre, aucun dossier (" .. table.concat(recu, ",") .. ")")
 	end
 }

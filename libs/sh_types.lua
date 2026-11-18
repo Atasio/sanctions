@@ -45,7 +45,7 @@ Sanctions.JOUR = 86400
 Sanctions.TEXTE_MAX = 1000
 Sanctions.FIN_MAX = 3650 * Sanctions.JOUR
 
-Sanctions.NET = {agir = "sanctionsAgir", dossier = "sanctionsDossier", journal = "sanctionsJournal", refus = "sanctionsRefus"}
+Sanctions.NET = {agir = "sanctionsAgir", dossier = "sanctionsDossier", journal = "sanctionsJournal", ouvrir = "sanctionsOuvrir", refus = "sanctionsRefus"}
 
 -- PLACEHOLDERS : la taille d'une page du journal et la longueur d'un filtre texte.
 Sanctions.PAGE_JOURNAL = 50

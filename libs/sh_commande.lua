@@ -2,7 +2,7 @@
 	sh_commande.lua — Le droit, la commande `!sanctions` et l'entrée du menu C.
 
 	Les deux côtés lisent le droit : le client pour afficher, le serveur pour décider (sv_net revalide tout).
-	La commande et le menu ne font qu'envoyer `Ouvrir` ; ils n'écrivent rien.
+	La commande et le menu ne font qu'ouvrir un écran (`Ouvrir`, ou le journal) ; ils n'écrivent rien.
 --]]
 
 VALDERAAN = VALDERAAN or {}
@@ -78,20 +78,37 @@ end
 
 if (!ulx or !ULib) then return end
 
+if (SERVER) then
+	--- Sans argument le journal général, sinon le dossier du compte visé.
+	---@param appelant Player
+	---@param texte string?
+	function Sanctions.Commande(appelant, texte)
+		if (string.Trim(texte or "") == "") then
+			if (!Sanctions.PeutGerer(appelant)) then
+				return ULib.tsayError(appelant, "Vous n'avez pas accès aux sanctions.", true)
+			end
+
+			return Sanctions.Repondre(appelant, "ouvrir", {})
+		end
+
+		local steamid64, raison = Sanctions.ResoudreCible(texte, appelant)
+
+		if (!steamid64) then
+			return ULib.tsayError(appelant, raison or "Aucun joueur ne correspond.", true)
+		end
+
+		Sanctions.Recevoir(appelant, "Ouvrir", {steamid64 = steamid64})
+	end
+end
+
 local commande = ulx.command("Valderaan", "ulx sanctions", function(appelant, texte)
 	if (!IsValid(appelant)) then
 		return ULib.console(appelant, "Le dossier de sanctions s'ouvre en jeu.")
 	end
 
-	local steamid64, raison = Sanctions.ResoudreCible(texte, appelant)
-
-	if (!steamid64) then
-		return ULib.tsayError(appelant, raison or "Vue de tout le serveur à venir : précisez un joueur ou un SteamID.", true)
-	end
-
-	Sanctions.Recevoir(appelant, "Ouvrir", {steamid64 = steamid64})
+	Sanctions.Commande(appelant, texte)
 end, "!sanctions")
 
 commande:addParam{type = ULib.cmds.StringArg, hint = "joueur ou SteamID", ULib.cmds.optional, ULib.cmds.takeRestOfLine}
 commande:defaultAccess(ULib.ACCESS_ADMIN)
-commande:help("Ouvre le dossier de sanctions d'un compte.")
+commande:help("Sans argument, le journal de tous les dossiers ; avec un joueur ou un SteamID, le dossier de son compte.")

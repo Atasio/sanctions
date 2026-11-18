@@ -94,6 +94,11 @@ hook.Add("InitializedPlugins", "sanctionsNet", function()
 		end
 	end)
 
+	-- La commande `!sanctions` sans argument : le serveur ne fait qu'ouvrir la fenêtre, qui demande sa page elle-même.
+	net.Receive(Sanctions.NET.ouvrir, function()
+		Sanctions.OuvrirJournal()
+	end)
+
 	-- Un refus qu'aucun écran ouvert ne prend s'affiche en notification : il ne se perd jamais en silence.
 	net.Receive(Sanctions.NET.refus, function()
 		local raison = net.ReadString()

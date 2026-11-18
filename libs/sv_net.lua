@@ -95,7 +95,7 @@ end
 
 --- Les réponses passent par ici ; le banc la remplace pour lire ce qu'un client aurait reçu.
 ---@param client Player
----@param genre "dossier"|"journal"|"refus"
+---@param genre "dossier"|"journal"|"ouvrir"|"refus"
 ---@param contenu table|string
 function Sanctions.Repondre(client, genre, contenu)
 	if (genre == "refus") then

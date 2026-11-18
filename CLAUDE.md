@@ -24,13 +24,14 @@ l'archi et l'état. Spec : `docs/dev/specs/2026-11-17-sanctions-design.md` ; rep
 | Fichier | Rôle |
 |---|---|
 | `sh_plugin.lua` | déclaration |
-| `libs/sh_commande.lua` | `Sanctions.PeutGerer` (seul lecteur du droit, des deux côtés), commande `!sanctions`, `ResoudreCible`, entrée `sanctions` du menu C |
+| `libs/sh_commande.lua` | `Sanctions.PeutGerer` (seul lecteur du droit, des deux côtés), commande `!sanctions` (`Commande` : sans argument elle ouvre le journal, sinon le dossier du compte), `ResoudreCible`, entrée `sanctions` du menu C |
 | `libs/sh_types.lua` | types d'infraction et sanctions (ids persistés), bornes, `ErreurFin`, `Etat`, `Libelle`, `EstSteamID64`, noms des canaux |
 | `libs/sv_base.lua` | tables `val_sanctions` et `val_sanctions_journal`, `Sanctions.Ecrire` (seule écriture, journal compris), `Creer`, `Modifier`, `Annuler`, `Lever`, `Lire`, `Dossier`, `Journal` (une page du journal général, curseur sur l'`id`) |
 | `libs/sv_ulib.lua` | `Sanctions.Appliquer` (seul appelant de `ULib.addBan` / `unban`, sous garde), rattrapage des ban / unban hors interface, remplacement de l'actif |
 | `libs/sv_net.lua` | `Sanctions.Recevoir` (débit, droit, forme, puis `sv_base`), `Repondre` ; canaux dans `Sanctions.NET` |
-| `libs/cl_net.lua` | `Sanctions.Agir(action, intention)`, miroir exact de `LIRE` (`sv_net.lua`) ; les réponses partent en hooks `SanctionsDossier` / `SanctionsRefus` (un refus qu'aucun écran ne prend devient une notification) |
+| `libs/cl_net.lua` | `Sanctions.Agir(action, intention)`, miroir exact de `LIRE` (`sv_net.lua`) ; les réponses partent en hooks `SanctionsDossier` / `SanctionsJournal` / `SanctionsRefus` (un refus qu'aucun écran ne prend devient une notification) ; le canal `ouvrir` ouvre le journal |
 | `libs/cl_liste.lua` | `Sanctions.Liste(parent, dossiers, options)`, la liste partagée des deux écrans (dépli sur le journal, actions en callback) ; `DateLongue`, `DateHeure`, `DateHeureCourte`, `Espacer` / `PoserEspace` (interlettrage), `Defilement` |
+| `libs/cl_journal.lua` | le journal général (`!sanctions` sans argument) : quatre filtres, pages de 50 par curseur, une seule requête en vol ; un clic de ligne ouvre la fenêtre staff du compte et cache le journal jusqu'à « Retour au journal » ; vue `sanctions_journal` |
 | `libs/cl_onglet.lua` | l'onglet `sanctions` du menu TAB (lecture seule, `Mien`), `DossiersEssai` et la vue de capture `sanctions_liste` |
 | `libs/cl_fenetre.lua` | la fenêtre staff d'un compte (liste, formulaire à fin datée, confirmations), ouverte par tout dossier reçu hors `Mien` ; vue `sanctions_fenetre` |
 | `banc/etat.lua` | la formule d'état sur des dossiers factices |
@@ -59,4 +60,4 @@ n'a jamais d'accès ULib (garde de `schema/libs/sv_banc_bot.lua`) : un scénario
 
 ## État
 
-Chantier en cours (tâche 8 sur 10, constats de séance en attente). Toutes les bornes sont des placeholders.
+Chantier en cours (tâche 14 sur 14 écrite ; restent le constat en jeu à un joueur et la séance à deux joueurs, tâche 10). Toutes les bornes sont des placeholders.

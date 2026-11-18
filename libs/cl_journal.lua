@@ -266,9 +266,11 @@ function PANEL:Reconstruire(bGarder)
 		compte = true,
 		survol = self.apercu.survol,
 		clic = function(dossier)
-			if (!self.apercu.fige) then
-				Sanctions.Agir("Ouvrir", {steamid64 = dossier.steamid64})
-			end
+			-- Une seule requête en vol : le refus qui revient doit être celui de l'écran qui l'attend.
+			if (self.apercu.fige or self.enCours) then return end
+
+			Sanctions.depuisJournal = {journal = self, steamid64 = dossier.steamid64, jusqu = CurTime() + 10}
+			Sanctions.Agir("Ouvrir", {steamid64 = dossier.steamid64})
 		end
 	})
 
@@ -460,7 +462,12 @@ vgui.Register("valSanctionsJournal", PANEL, "EditablePanel")
 
 --- Une fenêtre à la fois : un second `!sanctions` repart d'une page neuve.
 function Sanctions.OuvrirJournal()
-	if (IsValid(Sanctions.journal)) then
+	local staff = Sanctions.fenetre
+
+	-- Un journal caché appartient à la fenêtre staff ouverte : elle part avec lui (`OnRemove`).
+	if (IsValid(staff) and staff.journal == Sanctions.journal) then
+		staff:Remove()
+	elseif (IsValid(Sanctions.journal)) then
 		Sanctions.journal:Remove()
 	end
 

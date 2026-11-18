@@ -202,6 +202,24 @@ function PANEL:MontrerListe()
 	end
 
 	self.verbes = {nouvelle}
+
+	if (IsValid(self.journal) or self.apercu.retour) then
+		local retour = self:Verbe("Retour au journal", false)
+
+		retour.DoClick = function()
+			self.retour = true
+
+			if (IsValid(self.journal)) then
+				self.journal:SetVisible(true)
+				self.journal:MakePopup()
+			end
+
+			self:Remove()
+		end
+
+		table.insert(self.verbes, 1, retour)
+	end
+
 	self:PlaceVerbs()
 end
 
@@ -739,6 +757,13 @@ function PANEL:Think()
 	self.bClic = bClic
 end
 
+-- Le journal ne survit à sa fenêtre que par « Retour au journal » ; fermer la fenêtre ferme tout.
+function PANEL:OnRemove()
+	if (IsValid(self.journal) and !self.retour) then
+		self.journal:Remove()
+	end
+end
+
 function PANEL:OnKeyCodePressed(key)
 	if (key == KEY_ESCAPE) then
 		self:Remove()
@@ -796,6 +821,9 @@ vgui.Register("valSanctionsFenetre", PANEL, "EditablePanel")
 ---@param recu SanctionsDossierRecu
 local function ouvrir(recu)
 	local fenetre = Sanctions.fenetre
+	local origine = Sanctions.depuisJournal
+
+	Sanctions.depuisJournal = nil
 
 	if (IsValid(fenetre) and fenetre.recu.steamid64 == recu.steamid64) then
 		return fenetre:Remplir(recu)
@@ -808,6 +836,12 @@ local function ouvrir(recu)
 	fenetre = vgui.Create("valSanctionsFenetre") --[[@as valSanctionsFenetre]]
 	fenetre:SetKeyboardInputEnabled(true)
 	fenetre:MakePopup()
+	-- Un dossier ouvert d'un clic du journal le cache jusqu'au retour ; `!sanctions <joueur>` n'en a pas.
+	if (origine and origine.steamid64 == recu.steamid64 and origine.jusqu > CurTime() and IsValid(origine.journal)) then
+		fenetre.journal = origine.journal
+		fenetre.journal:SetVisible(false)
+	end
+
 	fenetre:Setup(recu)
 	Sanctions.fenetre = fenetre
 end
@@ -847,7 +881,7 @@ K.Vue("sanctions_fenetre", {WIDTH, LIST_HEIGHT}, function(parent, data)
 	local fenetre = parent:Add("valSanctionsFenetre") --[[@as valSanctionsFenetre]]
 
 	fenetre:Setup(recuEssai(), {fige = true, survol = data.survol, saisie = data.saisie, maintenant = MAINTENANT,
-		survolOption = data.survolOption})
+		survolOption = data.survolOption, retour = data.retour})
 
 	if (data.saisie) then
 		fenetre:MontrerFormulaire()
@@ -856,6 +890,7 @@ K.Vue("sanctions_fenetre", {WIDTH, LIST_HEIGHT}, function(parent, data)
 	fenetre.refus = data.refus
 end, {
 	liste = function() return {survol = 2, refus = "Vous n'avez plus accès aux sanctions."} end,
+	retour = function() return {retour = true} end,
 	avertissement = function()
 		return {saisie = {type = "hrp_vocal", sanction = "aucune", texte = "", ouverte = "type"}, survolOption = "metagaming"}
 	end,
