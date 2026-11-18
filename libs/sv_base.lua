@@ -8,7 +8,7 @@
 local PLUGIN = PLUGIN
 local Sanctions = VALDERAAN.Sanctions
 
-local MODIFIABLES = {type = true, texte = true, sanction = true, jours = true}
+local MODIFIABLES = {type = true, texte = true, sanction = true, fin = true}
 
 -- ⚠️ L'enveloppe `mysql` de Helix met toute valeur entre guillemets (`sv_mysql.lua:158`) : pas de NULL possible.
 -- « Aucun » s'écrit donc 0 ou "" en base, et redevient nil à la lecture.
@@ -36,7 +36,7 @@ local function versDossier(row)
 		type = row.type,
 		texte = row.texte,
 		sanction = row.sanction,
-		jours = nonNul(row.jours),
+		fin = nonNul(row.fin),
 		debut = tonumber(row.debut),
 		levee_le = nonNul(row.levee_le),
 		auteur_steamid64 = row.auteur_steamid64,
@@ -55,7 +55,7 @@ local function createTables()
 		query:Create("type", "VARCHAR(32) NOT NULL")
 		query:Create("texte", "TEXT NOT NULL")
 		query:Create("sanction", "VARCHAR(16) NOT NULL")
-		query:Create("jours", "INT(11) NOT NULL DEFAULT 0")
+		query:Create("fin", "INT(11) NOT NULL DEFAULT 0")
 		query:Create("debut", "INT(11) NOT NULL")
 		query:Create("levee_le", "INT(11) NOT NULL DEFAULT 0")
 		query:Create("auteur_steamid64", "VARCHAR(20) NOT NULL")
@@ -182,7 +182,7 @@ function Sanctions.Ecrire(acteur, action, avant, champs, callback, note)
 		local dossier = table.Merge(table.Copy(avant), champs)
 
 		-- `false` marque un champ remis à « aucun » : `pairs` aurait sauté un nil.
-		if (dossier.jours == false) then dossier.jours = nil end
+		if (dossier.fin == false) then dossier.fin = nil end
 
 		journaliser(acteur, action, avant.id, diffAvant, table.Merge(diffApres, note or {}), function()
 			appliquer(acteur, action, avant, dossier, callback)
@@ -223,7 +223,7 @@ function Sanctions.DossiersDe(steamid64, callback)
 end
 
 ---@param cible64 string
----@param champs {type: string, texte: string, sanction: SanctionKind, jours: integer?}
+---@param champs {type: string, texte: string, sanction: SanctionKind, fin: integer?, debut: integer?}
 ---@param callback fun(dossier: SanctionDossier?, raison: string?)?
 function Sanctions.Creer(acteur, cible64, champs, callback)
 	local maintenant = os.time()
@@ -232,7 +232,7 @@ function Sanctions.Creer(acteur, cible64, champs, callback)
 		type = champs.type,
 		texte = champs.texte,
 		sanction = champs.sanction,
-		jours = champs.sanction == "temporaire" and champs.jours or nil,
+		fin = champs.sanction == "temporaire" and champs.fin or nil,
 		debut = champs.debut or maintenant,
 		auteur_steamid64 = acteur.steamid64,
 		auteur_nom = acteur.nom,
@@ -253,7 +253,7 @@ end
 
 --- Type et texte se corrigent toujours ; la sanction d'un dossier levé ou terminé, jamais (rebannir = un nouveau
 --- dossier). Un avertissement qui devient un bannissement commence maintenant.
----@param champs {type: string?, texte: string?, sanction: SanctionKind?, jours: integer?}
+---@param champs {type: string?, texte: string?, sanction: SanctionKind?, fin: integer?}
 function Sanctions.Modifier(acteur, id, champs, callback)
 	callback = callback or function() end
 
@@ -271,14 +271,14 @@ function Sanctions.Modifier(acteur, id, champs, callback)
 
 		local sanction = voulu.sanction or avant.sanction
 
-		if (voulu.sanction or voulu.jours) then
+		if (voulu.sanction or voulu.fin) then
 			local etat = Sanctions.Etat(avant, os.time())
 
 			if (etat == "leve" or etat == "termine") then
 				return callback(nil, "Ce bannissement est fini : posez un nouveau dossier.")
 			end
 
-			voulu.jours = (sanction == "temporaire") and (voulu.jours or avant.jours) or false
+			voulu.fin = (sanction == "temporaire") and (voulu.fin or avant.fin) or false
 
 			if (avant.sanction == "aucune" and sanction != "aucune") then
 				voulu.debut = os.time()

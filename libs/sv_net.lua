@@ -1,8 +1,8 @@
 --[[
 	sv_net.lua — La seule porte d'entrée du réseau : débit, droit, forme, puis sv_base.
 
-	Le client n'envoie qu'une intention. L'auteur est toujours l'appelant, lu ici ; aucun nom, aucune date, aucun
-	auteur ne vient du réseau. `Mien` ne lit aucune cible.
+	Le client n'envoie qu'une intention. L'auteur est toujours l'appelant, lu ici ; ni nom ni auteur ne vient du réseau,
+	et la seule date reçue, la fin d'un temporaire, est bornée par `ErreurFin`. `Mien` ne lit aucune cible.
 --]]
 
 local Sanctions = VALDERAAN.Sanctions
@@ -49,12 +49,6 @@ local function erreurTexte(texte)
 	if (longueur > Sanctions.TEXTE_MAX) then return "Le texte dépasse " .. Sanctions.TEXTE_MAX .. " caractères." end
 end
 
-local function erreurJours(jours)
-	if (!isnumber(jours) or jours != math.floor(jours) or jours < Sanctions.JOURS_MIN or jours > Sanctions.JOURS_MAX) then
-		return "La durée va de " .. Sanctions.JOURS_MIN .. " à " .. Sanctions.JOURS_MAX .. " jours."
-	end
-end
-
 --- Valide les champs présents ; `complet` les exige tous (création). Rend les champs nettoyés, ou nil et la raison.
 local function valider(champs, complet)
 	local propre = {}
@@ -76,13 +70,13 @@ local function valider(champs, complet)
 		propre.sanction = champs.sanction
 	end
 
-	-- Un passage en temporaire porte sa durée : l'ancien dossier n'en a peut-être pas. À la création, la durée d'une
+	-- Un passage en temporaire porte sa fin : l'ancien dossier n'en a peut-être pas. À la création, la fin d'une
 	-- autre sanction arrive à 0 du réseau et s'ignore.
-	if (propre.sanction == "temporaire" or (!complet and champs.jours != nil)) then
-		local erreur = erreurJours(champs.jours)
+	if (propre.sanction == "temporaire" or (!complet and champs.fin != nil)) then
+		local erreur = Sanctions.ErreurFin(champs.fin, os.time())
 
 		if (erreur) then return nil, erreur end
-		propre.jours = champs.jours
+		propre.fin = champs.fin
 	end
 
 	return propre
@@ -168,7 +162,7 @@ end
 --- Une intention déjà lue du réseau (ou fabriquée par le banc). Rien n'y est cru : tout est revalidé ici.
 ---@param client Player
 ---@param action SanctionAction
----@param intention {steamid64: string?, id: integer?, type: string?, texte: string?, sanction: string?, jours: integer?}
+---@param intention {steamid64: string?, id: integer?, type: string?, texte: string?, sanction: string?, fin: integer?}
 function Sanctions.Recevoir(client, action, intention)
 	if (!IsValid(client)) then return end
 
@@ -228,7 +222,7 @@ local LIRE = {
 	Creer = function()
 		return {
 			steamid64 = net.ReadString(), type = net.ReadString(), texte = net.ReadString(),
-			sanction = net.ReadString(), jours = net.ReadUInt(16)
+			sanction = net.ReadString(), fin = net.ReadUInt(32)
 		}
 	end,
 	Modifier = function()
@@ -236,7 +230,7 @@ local LIRE = {
 
 		for _, cle in ipairs(Sanctions.CHAMPS_MODIFIABLES) do
 			if (net.ReadBool()) then
-				intention[cle] = (cle == "jours") and net.ReadUInt(16) or net.ReadString()
+				intention[cle] = (cle == "fin") and net.ReadUInt(32) or net.ReadString()
 			end
 		end
 

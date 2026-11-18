@@ -126,11 +126,10 @@ hook.Add(ULib.HOOK_USER_BANNED, "sanctionsRattrapage", function(steamid, entree)
 	local champs = {type = "autre", texte = texte, sanction = "definitive"}
 	local unban = tonumber(entree.unban) or 0
 
-	if (unban > 0) then
+	-- Au-delà de FIN_MAX, un ban d'ULX vaut un définitif : la colonne `fin` (INT signé) ne le tiendrait pas toujours.
+	if (unban > 0 and unban <= os.time() + Sanctions.FIN_MAX) then
 		champs.sanction = "temporaire"
-		champs.jours = math.Clamp(math.ceil((unban - os.time()) / Sanctions.JOUR), Sanctions.JOURS_MIN, Sanctions.JOURS_MAX)
-		-- Les jours sont entiers, pas la durée d'ULX : le début recule pour que l'échéance tombe sur la sienne.
-		champs.debut = unban - champs.jours * Sanctions.JOUR
+		champs.fin = unban
 	end
 
 	local steamid64 = util.SteamIDTo64(steamid)

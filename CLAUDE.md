@@ -14,8 +14,9 @@ l'archi et l'état. Spec : `docs/dev/specs/2026-11-17-sanctions-design.md` ; rep
 - **Un seul droit**, l'accès ULX `ulx sanctions`, lu par `CAMI.PlayerHasAccess` dans `Sanctions.PeutGerer`.
 - **Le menu C ne passe pas par `CanProperty`** : Helix n'y laisse que les admins, son plugin `propprotect` y refuse
   toute entité qu'on ne possède pas (un joueur compris), et l'ordre des méthodes de plugin n'est pas garanti.
-- **Un dossier né d'un rattrapage ne réécrit pas ULib** : il garde le motif et l'auteur d'ULX, et son `debut` recule
-  pour que l'échéance en jours entiers tombe sur celle d'ULib.
+- **Un dossier né d'un rattrapage ne réécrit pas ULib** : il garde le motif et l'auteur d'ULX, et sa `fin` est l'`unban`
+  d'ULib, à la seconde.
+- **Un temporaire stocke sa fin, pas une durée** : la seule date reçue du réseau, bornée par `Sanctions.ErreurFin`.
 - **L'état ne se stocke pas** : `Sanctions.Etat(dossier, maintenant)` le recalcule des deux côtés.
 
 ## Structure
@@ -24,14 +25,14 @@ l'archi et l'état. Spec : `docs/dev/specs/2026-11-17-sanctions-design.md` ; rep
 |---|---|
 | `sh_plugin.lua` | déclaration |
 | `libs/sh_commande.lua` | `Sanctions.PeutGerer` (seul lecteur du droit, des deux côtés), commande `!sanctions`, `ResoudreCible`, entrée `sanctions` du menu C |
-| `libs/sh_types.lua` | types d'infraction et sanctions (ids persistés), bornes, `Etat`, `Libelle`, `EstSteamID64`, noms des canaux |
+| `libs/sh_types.lua` | types d'infraction et sanctions (ids persistés), bornes, `ErreurFin`, `Etat`, `Libelle`, `EstSteamID64`, noms des canaux |
 | `libs/sv_base.lua` | tables `val_sanctions` et `val_sanctions_journal`, `Sanctions.Ecrire` (seule écriture, journal compris), `Creer`, `Modifier`, `Annuler`, `Lever`, `Lire`, `Dossier` |
 | `libs/sv_ulib.lua` | `Sanctions.Appliquer` (seul appelant de `ULib.addBan` / `unban`, sous garde), rattrapage des ban / unban hors interface, remplacement de l'actif |
 | `libs/sv_net.lua` | `Sanctions.Recevoir` (débit, droit, forme, puis `sv_base`), `Repondre` ; canaux dans `Sanctions.NET` |
 | `libs/cl_net.lua` | `Sanctions.Agir(action, intention)`, miroir exact de `LIRE` (`sv_net.lua`) ; les réponses partent en hooks `SanctionsDossier` / `SanctionsRefus` (un refus qu'aucun écran ne prend devient une notification) |
-| `libs/cl_liste.lua` | `Sanctions.Liste(parent, dossiers, options)`, la liste partagée des deux écrans (dépli sur le journal, actions en callback) ; `DateLongue`, `DateHeure`, `Jours`, `Espacer` / `PoserEspace` (interlettrage), `Defilement` |
+| `libs/cl_liste.lua` | `Sanctions.Liste(parent, dossiers, options)`, la liste partagée des deux écrans (dépli sur le journal, actions en callback) ; `DateLongue`, `DateHeure`, `DateHeureCourte`, `Espacer` / `PoserEspace` (interlettrage), `Defilement` |
 | `libs/cl_onglet.lua` | l'onglet `sanctions` du menu TAB (lecture seule, `Mien`), `DossiersEssai` et la vue de capture `sanctions_liste` |
-| `libs/cl_fenetre.lua` | la fenêtre staff d'un compte (liste, formulaire, confirmations), ouverte par tout dossier reçu hors `Mien` ; vue `sanctions_fenetre` |
+| `libs/cl_fenetre.lua` | la fenêtre staff d'un compte (liste, formulaire à fin datée, confirmations), ouverte par tout dossier reçu hors `Mien` ; vue `sanctions_fenetre` |
 | `banc/etat.lua` | la formule d'état sur des dossiers factices |
 | `banc/base.lua` | dossiers et journal sur un faux compte |
 | `banc/ulib.lua` | application, remplacement et rattrapage sur des faux comptes |

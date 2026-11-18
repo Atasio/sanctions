@@ -95,18 +95,18 @@ end
 --- Partagées avec la vue de la fenêtre staff : les deux maquettes montrent le même dossier.
 function Sanctions.DossiersEssai()
 	return {
-		{id = 4, type = "freekill", sanction = "temporaire", jours = 3, debut = quand(17, 11, 21, 4), cree_le = quand(17, 11, 21, 4),
+		{id = 4, type = "freekill", sanction = "temporaire", fin = quand(20, 11, 21, 4), debut = quand(17, 11, 21, 4), cree_le = quand(17, 11, 21, 4),
 			auteur_nom = "Elrond", annulee = false, journal = {creation("Elrond", quand(17, 11, 21, 4))},
 			texte = "A abattu trois villageois à la sortie de la taverne, sans la moindre scène."},
 		{id = 3, type = "hrp_vocal", sanction = "aucune", debut = quand(12, 11), cree_le = quand(12, 11),
 			auteur_nom = "Galadh", annulee = false, journal = {creation("Galadh", quand(12, 11))},
 			texte = "Parlait de son match de foot en vocal de proximité pendant une audience."},
-		{id = 2, type = "metagaming", sanction = "temporaire", jours = 2, debut = quand(2, 11, 21, 4), cree_le = quand(2, 11, 21, 4),
+		{id = 2, type = "metagaming", sanction = "temporaire", fin = quand(4, 11, 21, 4), debut = quand(2, 11, 21, 4), cree_le = quand(2, 11, 21, 4),
 			auteur_nom = "Elrond", annulee = false,
 			texte = "A utilisé le nom d'un assassin appris sur Discord pour le dénoncer en jeu, avant toute enquête de son personnage.",
 			journal = {
 				creation("Elrond", quand(2, 11, 21, 4)),
-				{action = "modification", quand = quand(3, 11, 18, 30), auteur_nom = "Galadh", avant = {jours = 5}, apres = {jours = 2}}
+				{action = "modification", quand = quand(3, 11, 18, 30), auteur_nom = "Galadh", avant = {fin = quand(7, 11, 21, 4)}, apres = {fin = quand(4, 11, 21, 4)}}
 			}},
 		{id = 1, type = "insulte", sanction = "aucune", debut = quand(28, 10), cree_le = quand(28, 10),
 			auteur_nom = "Mirwen", annulee = true,

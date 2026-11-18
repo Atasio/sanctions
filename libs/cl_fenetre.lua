@@ -17,6 +17,11 @@ local WIDTH, CORNER, LIST_HEIGHT = 900, 38, 560
 local FIELD_TOP, FIELD_WIDTH, FIELD_HEIGHT = 130, 400, 38
 local OPTION_HEIGHT, OPTION_PAD = 34, 10
 local TEXT_HEIGHT = 120
+local DATE_WIDTH, HOUR_WIDTH = 140, 84
+
+-- Le formulaire ne montre que deux sanctions : la case « Définitif » départage les deux bannissements persistés.
+local FORMES = {{id = "aucune", libelle = "Avertissement"}, {id = "ban", libelle = "Bannissement"}}
+local RACCOURCIS = {1, 3, 7, 30}
 
 local function theme()
 	return VALDERAAN.MenuTheme
@@ -41,6 +46,39 @@ local function libelleDe(options, id)
 	end
 
 	return ""
+end
+
+local function pluriel(n, mot)
+	return n .. " " .. mot .. (n > 1 and "s" or "")
+end
+
+local function dans(secondes)
+	if (secondes < 3600) then
+		return "dans " .. math.max(1, math.floor(secondes / 60)) .. " min"
+	elseif (secondes < Sanctions.JOUR) then
+		return "dans " .. math.floor(secondes / 3600) .. " h"
+	end
+
+	local jours, heures = math.floor(secondes / Sanctions.JOUR), math.floor(secondes % Sanctions.JOUR / 3600)
+
+	return "dans " .. pluriel(jours, "jour") .. (heures > 0 and (" et " .. heures .. " h") or "")
+end
+
+--- Une date locale saisie « JJ/MM/AAAA » et « HH:MM », ou nil si elle n'existe pas (31/02, 25:00).
+local function lireDate(date, heure)
+	local jour, mois, annee = string.Trim(date):match("^(%d%d?)/(%d%d?)/(%d%d%d%d)$")
+	local h, minute = string.Trim(heure):match("^(%d%d?)[:h](%d%d)$")
+
+	if (!jour or !h) then return end
+
+	local voulu = {year = tonumber(annee), month = tonumber(mois), day = tonumber(jour), hour = tonumber(h), min = tonumber(minute), sec = 0}
+	local quand = os.time(voulu)
+	local relu = quand and os.date("*t", quand)
+
+	if (!relu or relu.year != voulu.year or relu.month != voulu.month or relu.day != voulu.day
+		or relu.hour != voulu.hour or relu.min != voulu.min) then return end
+
+	return quand
 end
 
 local function fermerSurEchap(entry, fenetre)
@@ -99,7 +137,7 @@ function PANEL:NouveauCorps(hauteur)
 		self.corps:Remove()
 	end
 
-	self.ouverte, self.envoi, self.dureeCadre = nil, nil, nil
+	self.ouverte, self.envoi, self.finCadres = nil, nil, nil
 	self:SetTall(S(hauteur))
 	self.corps = self:Add("Panel")
 	self.corps:SetSize(self:GetWide(), self:GetTall())
@@ -167,7 +205,7 @@ function PANEL:MontrerListe()
 	self:PlaceVerbs()
 end
 
---- Le formulaire, vide ou prérempli d'un dossier. Sa hauteur suit la ligne de durée, qui n'existe qu'en temporaire.
+--- Le formulaire, vide ou prérempli d'un dossier. Sa hauteur suit la ligne du bannissement, absente d'un avertissement.
 ---@param dossier SanctionDossier?
 function PANEL:MontrerFormulaire(dossier)
 	local apercu = self.apercu.saisie or {}
@@ -187,15 +225,18 @@ function PANEL:MontrerFormulaire(dossier)
 	self.bSanctionFigee = etat == "leve" or etat == "termine"
 
 	self:Deroulante(corps, 40, "Infraction", Sanctions.TYPES, "type")
-	self:Deroulante(corps, 460, "Sanction", Sanctions.SANCTIONS, "sanction")
+	self:Deroulante(corps, 460, "Sanction", FORMES, "sanction",
+		function() return self.saisie.sanction == "aucune" and "aucune" or "ban" end,
+		function(id)
+			if (id == "aucune") then
+				self.saisie.sanction = "aucune"
+			elseif (self.saisie.sanction == "aucune") then
+				self.saisie.sanction = "temporaire"
+			end
+		end)
 
-	self.dureeCadre = corps:Add("Panel")
-	self.dureeCadre:SetSize(S(96), S(FIELD_HEIGHT))
-	self.jours = K.TextEntry(self.dureeCadre, tostring(apercu.jours or (dossier and dossier.jours) or 1), S(FIELD_HEIGHT))
-	self.jours:SetNumeric(true)
-	self.jours:SetEditable(!self.bSanctionFigee)
-	self.jours:GetParent():Dock(FILL)
-	fermerSurEchap(self.jours, self)
+	self:LigneFin(corps, apercu.fin or (dossier and dossier.fin))
+	self.raccourci = apercu.raccourci or (!dossier and 1) or nil
 
 	self.regle = corps:Add("Panel")
 	self.regle:SetSize(S(820), S(40))
@@ -236,15 +277,19 @@ function PANEL:MontrerFormulaire(dossier)
 
 	-- ⚠️ Pendant une capture `valderaan_ui`, `ScrH()` vaut la hauteur de la cible de rendu : un `Actualiser` relancé par
 	-- `Think` y poserait tout à l'échelle 0,9. Il ne repart donc que d'un vrai changement.
-	self.dernierTexte, self.derniersJours = self.texte:GetText(), self.jours:GetText()
+	self.dernierTexte, self.derniereDate, self.derniereHeure = self.texte:GetText(), self.date:GetText(), self.heure:GetText()
 
 	if (apercu.ouverte) then
 		self:Ouvrir(self.deroulantes[apercu.ouverte])
 	end
 end
 
-function PANEL:Deroulante(corps, x, libelle, options, cle)
+--- `lire` et `choisir` traduisent l'option montrée en saisie, quand la liste n'est pas les ids persistés.
+function PANEL:Deroulante(corps, x, libelle, options, cle, lire, choisir)
 	local field = corps:Add("Panel")
+
+	field.lire = lire or function() return self.saisie[cle] end
+	field.choisir = choisir or function(id) self.saisie[cle] = id end
 
 	field:SetPos(S(x), S(FIELD_TOP))
 	field:SetSize(S(FIELD_WIDTH), S(FIELD_HEIGHT))
@@ -259,7 +304,7 @@ function PANEL:Deroulante(corps, x, libelle, options, cle)
 		surface.SetDrawColor(bOuvert and col.accent or col.lineSoft)
 		surface.DrawOutlinedRect(0, 0, width, height)
 		poserEspace(field.trace, K.Role("micro"), S(12), height / 2, col.text2)
-		draw.SimpleText(libelleDe(options, self.saisie[cle]), K.Role("text"), S(148), height / 2,
+		draw.SimpleText(libelleDe(options, field.lire()), K.Role("text"), S(148), height / 2,
 			field.bFige and col.text3 or col.textTitle, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 
 		if (field.bFige) then return end
@@ -306,7 +351,7 @@ function PANEL:Choix(corps)
 			if (bSurvol) then
 				skin.Selection(S(2), top, width - S(4), S(OPTION_HEIGHT), 0.6, false)
 				ink = col.textTitle
-			elseif (option.id == self.saisie[field.cle]) then
+			elseif (option.id == field.lire()) then
 				ink = col.accent
 			end
 
@@ -319,7 +364,7 @@ function PANEL:Choix(corps)
 		local option = field and field.options[math.floor((mouseY - S(OPTION_PAD)) / S(OPTION_HEIGHT)) + 1]
 
 		if (option) then
-			self.saisie[field.cle] = option.id
+			field.choisir(option.id)
 			self:Actualiser()
 		end
 
@@ -343,24 +388,133 @@ function PANEL:Ouvrir(field)
 	self.popup:MoveToFront()
 end
 
+--- La ligne du bannissement : raccourcis, date et heure de fin, puis la case « Définitif » qui les masque.
+function PANEL:LigneFin(corps, fin)
+	fin = fin or (self:Maintenant() + Sanctions.JOUR)
+	self.finCadres, self.raccourcis = {}, {}
+
+	for _, jours in ipairs(RACCOURCIS) do
+		local bouton = corps:Add("Panel")
+
+		bouton.text = jours .. " j"
+		surface.SetFont(K.Role("text"))
+		bouton:SetSize(surface.GetTextSize(bouton.text) + S(16), S(FIELD_HEIGHT))
+		bouton:SetCursor("hand")
+		bouton.Paint = function(panel, width, height)
+			local col = theme().col
+			local ink = self.raccourci == jours and col.accent or (panel:IsHovered() and col.textTitle or col.text2)
+
+			draw.SimpleText(panel.text, K.Role("text"), width / 2, height / 2, ink, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		end
+		bouton.OnMousePressed = function()
+			self:Raccourci(jours)
+		end
+
+		self.raccourcis[#self.raccourcis + 1] = bouton
+	end
+
+	self.date = self:ChampFin(corps, os.date("%d/%m/%Y", fin), DATE_WIDTH)
+	self.heure = self:ChampFin(corps, os.date("%H:%M", fin), HOUR_WIDTH)
+	self.texteFinInitial = self.date:GetText() .. " " .. self.heure:GetText()
+
+	self.definitif = corps:Add("Panel")
+	self.definitif.text = espacer("Définitif", K.Role("micro"), 3)
+	self.definitif:SetSize(S(130), S(FIELD_HEIGHT))
+	self.definitif:SetCursor(self.bSanctionFigee and "arrow" or "hand")
+	self.definitif.Paint = function(panel, width, height)
+		local col = theme().col
+		local box = K.EvenBox(S(20))
+		local top = math.floor((height - box) / 2)
+
+		surface.SetDrawColor((panel:IsHovered() and !self.bSanctionFigee) and col.accent or col.lineSoft)
+		surface.DrawOutlinedRect(0, top, box, box)
+
+		if (self.saisie.sanction == "definitive") then
+			K.Check(box / 2, top + box / 2, K.EvenBox(box - S(4)), self.bSanctionFigee and col.text3 or col.accent)
+		end
+
+		poserEspace(panel.text, K.Role("micro"), box + S(12), height / 2, self.bSanctionFigee and col.text3 or col.text2)
+	end
+	self.definitif.OnMousePressed = function()
+		if (self.bSanctionFigee) then return end
+
+		self.saisie.sanction = self.saisie.sanction == "definitive" and "temporaire" or "definitive"
+		self:Actualiser()
+	end
+end
+
+function PANEL:ChampFin(corps, texte, largeur)
+	local cadre = corps:Add("Panel")
+
+	cadre:SetSize(S(largeur), S(FIELD_HEIGHT))
+
+	local entry = K.TextEntry(cadre, texte, S(FIELD_HEIGHT))
+
+	entry:GetParent():Dock(FILL)
+	entry:SetEditable(!self.bSanctionFigee)
+	entry.AllowInput = function(_, char)
+		return !char:match("[%d/:]")
+	end
+	fermerSurEchap(entry, self)
+	self.finCadres[#self.finCadres + 1] = cadre
+
+	return entry
+end
+
+--- Un raccourci compte depuis maintenant et remplit les deux champs, qui restent la seule source lue.
+function PANEL:Raccourci(jours)
+	if (self.bSanctionFigee) then return end
+
+	local fin = self:Maintenant() + jours * Sanctions.JOUR
+
+	self.date:SetText(os.date("%d/%m/%Y", fin))
+	self.heure:SetText(os.date("%H:%M", fin))
+	self.raccourci, self.derniereDate, self.derniereHeure = jours, self.date:GetText(), self.heure:GetText()
+	self:Actualiser()
+end
+
+function PANEL:Maintenant()
+	return self.apercu.maintenant or os.time()
+end
+
+--- La fin saisie, et vrai si c'est celle du dossier, dont les champs n'ont pas bougé (un rattrapage d'ULib garde ses
+--- secondes).
+function PANEL:LireFin()
+	if (self.dossier and self.dossier.fin and self.date:GetText() .. " " .. self.heure:GetText() == self.texteFinInitial) then
+		return self.dossier.fin, true
+	end
+
+	return lireDate(self.date:GetText(), self.heure:GetText())
+end
+
 --- Ce que le formulaire enverrait, ou la raison qui éteint le verbe. Le serveur revalide tout.
 ---@return table? intention
 ---@return string? raison
 function PANEL:LireSaisie()
 	local saisie = self.saisie
 	local texte = string.Trim(self.texte:GetText())
-	local jours = tonumber(self.jours:GetText())
-
 	if (texte == "") then
 		return nil, "Décrivez le cas."
 	end
 
-	if (saisie.sanction == "temporaire"
-		and (!jours or jours != math.floor(jours) or jours < Sanctions.JOURS_MIN or jours > Sanctions.JOURS_MAX)) then
-		return nil, "Une durée de " .. Sanctions.JOURS_MIN .. " à " .. Sanctions.JOURS_MAX .. " jours."
+	local fin
+
+	if (saisie.sanction == "temporaire" and !self.bSanctionFigee) then
+		local bInchangee
+
+		fin, bInchangee = self:LireFin()
+
+		if (!fin) then
+			return nil, "Une fin au format JJ/MM/AAAA et HH:MM."
+		end
+
+		-- Une fin qu'on n'a pas touchée ne s'envoie pas : un dossier qui expire formulaire ouvert garde son texte corrigeable.
+		local erreur = !bInchangee and Sanctions.ErreurFin(fin, self:Maintenant())
+
+		if (erreur) then return nil, erreur end
 	end
 
-	local voulu = {type = saisie.type, texte = texte, sanction = saisie.sanction, jours = saisie.sanction == "temporaire" and jours or nil}
+	local voulu = {type = saisie.type, texte = texte, sanction = saisie.sanction, fin = fin}
 
 	if (!self.dossier) then
 		voulu.steamid64 = self.recu.steamid64
@@ -390,17 +544,6 @@ function PANEL:LireSaisie()
 	return diff
 end
 
--- L'échéance qu'aurait le bannissement : un dossier qui bannissait déjà garde son début, sinon il part d'aujourd'hui.
-function PANEL:Echeance(jours)
-	local debut = self.apercu.maintenant or os.time()
-
-	if (self.dossier and self.dossier.sanction != "aucune") then
-		debut = self.dossier.debut
-	end
-
-	return debut + jours * Sanctions.JOUR
-end
-
 function PANEL:LibelleEnvoi()
 	if (self.dossier) then
 		return "Enregistrer"
@@ -410,18 +553,38 @@ function PANEL:LibelleEnvoi()
 		return "Bannir définitivement"
 	end
 
-	local jours = tonumber(self.jours:GetText())
+	local fin = self:LireFin()
 
-	return (jours and jours >= 1) and ("Bannir " .. Sanctions.Jours(jours)) or "Bannir"
+	return fin and ("Bannir jusqu'au " .. Sanctions.DateHeureCourte(fin)) or "Bannir"
 end
 
---- Recalcule ce qui dépend de la saisie : la place de la durée, la hauteur, le verbe et sa raison.
+--- Recalcule ce qui dépend de la saisie : la ligne du bannissement, la hauteur, le verbe et sa raison.
 function PANEL:Actualiser()
-	local bDuree = self.saisie.sanction == "temporaire"
-	local haut = bDuree and 238 or 184	local hauteur = haut + 40 + TEXT_HEIGHT + 24 + 80
+	local sanction = self.saisie.sanction
+	local bFin = sanction == "temporaire"
+	local bRaccourcis = bFin and !self.bSanctionFigee
+	local haut = sanction != "aucune" and 238 or 184
+	local hauteur = haut + 40 + TEXT_HEIGHT + 24 + 80
+	-- Le texte d'un raccourci s'aligne sur le bord des champs, pas sa boîte.
+	local x = bRaccourcis and S(32) or S(40)
 
-	self.dureeCadre:SetVisible(bDuree)
-	self.dureeCadre:SetPos(S(40), S(184))
+	for _, bouton in ipairs(self.raccourcis) do
+		bouton:SetVisible(bRaccourcis)
+		bouton:SetPos(x, S(184))
+		x = x + (bRaccourcis and bouton:GetWide() or 0)
+	end
+
+	x = x + (bRaccourcis and S(16) or 0)
+
+	for _, cadre in ipairs(self.finCadres) do
+		cadre:SetVisible(bFin)
+		cadre:SetPos(x, S(184))
+		x = x + cadre:GetWide() + S(12)
+	end
+
+	self.finX = x + S(4)
+	self.definitif:SetVisible(sanction != "aucune")
+	self.definitif:SetPos(S(WIDTH - 40 - 130), S(184))
 	self.regle:SetPos(S(40), S(haut - 10))
 	self.texteCadre:SetPos(S(40), S(haut + 40))
 
@@ -435,12 +598,11 @@ function PANEL:Actualiser()
 	end
 
 	local _, raison = self:LireSaisie()
-	local jours = tonumber(self.jours:GetText())
 	local libelle = theme().upper(self:LibelleEnvoi())
+	local fin, maintenant = bFin and self:LireFin(), self:Maintenant()
 
 	self.texteVide = self.texte:GetText() == ""
-	self.echeance = (bDuree and jours and jours >= Sanctions.JOURS_MIN and jours <= Sanctions.JOURS_MAX)
-		and ("jusqu'au " .. Sanctions.DateHeure(self:Echeance(jours))) or nil
+	self.dans = (fin and fin > maintenant) and dans(fin - maintenant) or nil
 
 	if (self.enCours) then
 		raison = "Envoi en cours…"
@@ -464,7 +626,7 @@ function PANEL:Envoyer()
 
 	local action = self.dossier and "Modifier" or "Creer"
 	local sanction = intention.sanction or self.dossier.sanction
-	local bBannit = sanction != "aucune" and (action == "Creer" or intention.sanction != nil or intention.jours != nil)
+	local bBannit = sanction != "aucune" and (action == "Creer" or intention.sanction != nil or intention.fin != nil)
 	local bLeve = self.dossier and sanction == "aucune" and Sanctions.BannitEncore(self.dossier, os.time())
 
 	local function envoyer()
@@ -489,13 +651,13 @@ function PANEL:Envoyer()
 		return envoyer()
 	end
 
-	local jours = intention.jours or (self.dossier and self.dossier.jours)
+	local fin = intention.fin or (self.dossier and self.dossier.fin)
 
 	VALDERAAN.Confirm({
-		title = sanction == "definitive" and "Bannir définitivement ?" or ("Bannir " .. Sanctions.Jours(jours) .. " ?"),
+		title = sanction == "definitive" and "Bannir définitivement ?" or ("Bannir jusqu'au " .. Sanctions.DateHeureCourte(fin) .. " ?"),
 		text = sanction == "definitive"
 			and (self.nom .. " ne pourra plus se connecter. Le bannissement se lève depuis ce dossier, en l'annulant.")
-			or (self.nom .. " ne pourra plus se connecter jusqu'au " .. Sanctions.DateHeure(self:Echeance(jours)) .. "."),
+			or (self.nom .. " ne pourra plus se connecter jusqu'au " .. Sanctions.DateHeure(fin) .. "."),
 		confirm = "Bannir",
 		OnConfirm = envoyer
 	})
@@ -555,10 +717,15 @@ end
 function PANEL:Think()
 	if (!IsValid(self.envoi)) then return end
 
-	local texte, jours = self.texte:GetText(), self.jours:GetText()
+	local texte, date, heure = self.texte:GetText(), self.date:GetText(), self.heure:GetText()
 
-	if (texte != self.dernierTexte or jours != self.derniersJours) then
-		self.dernierTexte, self.derniersJours = texte, jours
+	if (texte != self.dernierTexte or date != self.derniereDate or heure != self.derniereHeure) then
+		-- Une fin retouchée à la main n'est plus celle d'un raccourci.
+		if (date != self.derniereDate or heure != self.derniereHeure) then
+			self.raccourci = nil
+		end
+
+		self.dernierTexte, self.derniereDate, self.derniereHeure = texte, date, heure
 		self:Actualiser()
 	end
 
@@ -615,20 +782,10 @@ function PANEL:Paint(width, height)
 			TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 	end
 
-	-- La durée n'a pas de libellé à elle : le mot « jours » et l'échéance qu'elle donnerait.
-	if (IsValid(self.dureeCadre) and self.dureeCadre:IsVisible()) then
-		local x, y = self.dureeCadre:GetPos()
-		local cy = y + self.dureeCadre:GetTall() / 2
-
-		x = x + self.dureeCadre:GetWide() + S(12)
-
-		local largeur = draw.SimpleText("jours", K.Role("text"), x, cy, self.bSanctionFigee and col.text3 or col.text1,
-			TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-
-		if (self.echeance) then
-			draw.SimpleText(self.echeance, K.Role("textIt"), x + largeur + S(24), cy, col.textNotes, TEXT_ALIGN_LEFT,
-				TEXT_ALIGN_CENTER)
-		end
+	-- ⚠️ `IsVisible` de l'entrée ne lit pas son cadre caché : c'est le cadre qui dit si la ligne est montrée.
+	if (self.dans and self.finCadres and self.finCadres[1]:IsVisible()) then
+		draw.SimpleText(self.dans, K.Role("textIt"), self.finX, S(184 + FIELD_HEIGHT / 2), col.textNotes, TEXT_ALIGN_LEFT,
+			TEXT_ALIGN_CENTER)
 	end
 end
 
@@ -703,7 +860,7 @@ end, {
 		return {saisie = {type = "hrp_vocal", sanction = "aucune", texte = "", ouverte = "type"}, survolOption = "metagaming"}
 	end,
 	temporaire = function()
-		return {saisie = {type = "freekill", sanction = "temporaire", jours = 3,
+		return {saisie = {type = "freekill", sanction = "temporaire", fin = MAINTENANT + 3 * Sanctions.JOUR, raccourci = 3,
 			texte = "A abattu trois villageois à la sortie de la taverne, sans la moindre scène."}}
 	end,
 	definitif = function()

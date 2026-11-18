@@ -19,7 +19,7 @@ local ECRIRE = {
 		net.WriteString(intention.type)
 		net.WriteString(intention.texte)
 		net.WriteString(intention.sanction)
-		net.WriteUInt(intention.jours or 0, 16)
+		net.WriteUInt(intention.fin or 0, 32)
 	end,
 	Modifier = function(intention)
 		net.WriteUInt(intention.id, 32)
@@ -30,8 +30,8 @@ local ECRIRE = {
 			net.WriteBool(valeur != nil)
 
 			if (valeur != nil) then
-				if (cle == "jours") then
-					net.WriteUInt(valeur, 16)
+				if (cle == "fin") then
+					net.WriteUInt(valeur, 32)
 				else
 					net.WriteString(valeur)
 				end

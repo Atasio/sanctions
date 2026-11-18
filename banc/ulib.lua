@@ -56,14 +56,14 @@ return {
 
 		local maintenant = os.time()
 		local temp = attendre(function(fin)
-			Sanctions.Creer(acteur, C[1], {type = "freekill", texte = "Trois jours", sanction = "temporaire", jours = 3}, fin)
+			Sanctions.Creer(acteur, C[1], {type = "freekill", texte = "Trois jours", sanction = "temporaire", fin = maintenant + 3 * Sanctions.JOUR}, fin)
 		end)
 		local entree = ULib.bans[sid(1)]
 
 		Banc.Verifier(1, entree and math.abs(entree.unban - (maintenant + 3 * Sanctions.JOUR)) <= 120 and #dossiers(1) == 1,
 			"temporaire 3 j : ULib jusqu'à +3 j, un seul dossier (écart " .. tostring(entree and entree.unban - maintenant - 3 * Sanctions.JOUR) .. " s, " .. #dossiers(1) .. " dossier)")
 
-		attendre(function(fin) Sanctions.Modifier(acteur, temp.id, {jours = 1}, fin) end)
+		attendre(function(fin) Sanctions.Modifier(acteur, temp.id, {fin = temp.debut + Sanctions.JOUR}, fin) end)
 		entree = ULib.bans[sid(1)]
 		local lignes = journal(temp.id)
 
@@ -84,7 +84,7 @@ return {
 			Sanctions.Creer(acteur, C[3], {type = "glitch_exploit", texte = "Premier", sanction = "definitive"}, fin)
 		end)
 		local second = attendre(function(fin)
-			Sanctions.Creer(acteur, C[3], {type = "metagaming", texte = "Second", sanction = "temporaire", jours = 5}, fin)
+			Sanctions.Creer(acteur, C[3], {type = "metagaming", texte = "Second", sanction = "temporaire", fin = os.time() + 5 * Sanctions.JOUR}, fin)
 		end)
 		local relu = attendre(function(fin) Sanctions.Lire(premier.id, fin) end)
 		lignes = journal(premier.id)
@@ -101,10 +101,10 @@ return {
 		local rattrape = dossiers(4)[1]
 		entree = ULib.bans[sid(4)]
 
-		Banc.Verifier(5, rattrape and rattrape.type == "autre" and rattrape.sanction == "temporaire" and rattrape.jours == 1
+		Banc.Verifier(5, rattrape and rattrape.type == "autre" and rattrape.sanction == "temporaire" and entree and rattrape.fin == entree.unban
 			and rattrape.texte == "Motif direct" and rattrape.auteur_steamid64 == util.SteamIDTo64("STEAM_0:1:12345")
 			and entree and entree.reason == "Motif direct" and Sanctions.Echeance(rattrape) == entree.unban,
-			"ban direct de 90 min : dossier autre de 1 j (" .. (rattrape and (rattrape.sanction .. ", " .. tostring(rattrape.jours) .. " j, " .. rattrape.auteur_nom) or "aucun") .. ")")
+			"ban direct de 90 min : dossier autre, fin = unban d'ULib (" .. (rattrape and (rattrape.sanction .. ", fin " .. tostring(rattrape.fin) .. " / " .. tostring(entree and entree.unban) .. ", " .. rattrape.auteur_nom) or "aucun") .. ")")
 
 		ULib.unban(sid(1))
 		Banc.Attendre(0.5)
@@ -115,7 +115,7 @@ return {
 			"unban direct : dossier levé, entrée levee (" .. tostring(lignes[#lignes].action) .. ")")
 
 		local fini = attendre(function(fin)
-			Sanctions.Creer(acteur, C[5], {type = "freekill", texte = "Fini", sanction = "temporaire", jours = 3, debut = os.time() - 10 * Sanctions.JOUR}, fin)
+			Sanctions.Creer(acteur, C[5], {type = "freekill", texte = "Fini", sanction = "temporaire", fin = os.time() - 7 * Sanctions.JOUR, debut = os.time() - 10 * Sanctions.JOUR}, fin)
 		end)
 
 		ULib.unban(sid(5))

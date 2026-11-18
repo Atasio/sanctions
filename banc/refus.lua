@@ -52,7 +52,7 @@ return {
 			return n
 		end
 
-		local valide = {steamid64 = CIBLE, type = "hrp_vocal", texte = "Bruit au micro", sanction = "aucune", jours = 0}
+		local valide = {steamid64 = CIBLE, type = "hrp_vocal", texte = "Bruit au micro", sanction = "aucune"}
 
 		local refus = {}
 
@@ -69,8 +69,10 @@ return {
 			{type = "inconnu"},
 			{texte = string.rep("a", Sanctions.TEXTE_MAX + 1)},
 			{texte = "   "},
-			{sanction = "temporaire", jours = 0},
-			{sanction = "temporaire", jours = Sanctions.JOURS_MAX + 1},
+			{sanction = "temporaire"},
+			{sanction = "temporaire", fin = os.time() - 60},
+			{sanction = "temporaire", fin = os.time() + Sanctions.FIN_MAX + 3600},
+			{sanction = "temporaire", fin = os.time() + 3600.5},
 			{steamid64 = CIBLE:sub(2)}
 		}
 		local raisons = {}
@@ -82,8 +84,8 @@ return {
 			raisons[#raisons + 1] = ok and "refus" or (tostring(r.genre) .. ":" .. tostring(r.contenu))
 		end
 
-		Banc.Verifier(2, table.concat(raisons, ",") == "refus,refus,refus,refus,refus,refus" and lignes() == 0,
-			"six intentions hors bornes refusées (" .. table.concat(raisons, ",") .. ")")
+		Banc.Verifier(2, table.concat(raisons, ",") == "refus,refus,refus,refus,refus,refus,refus,refus" and lignes() == 0,
+			"huit intentions hors bornes refusées (" .. table.concat(raisons, ",") .. ")")
 
 		local premier = agir(modo, "Creer", table.Copy(valide))
 		recu[modo] = nil

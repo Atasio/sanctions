@@ -29,12 +29,17 @@ function Sanctions.DateLongue(quand)
 	return dateCourte(quand) .. " " .. os.date("%Y", quand)
 end
 
-function Sanctions.DateHeure(quand)
-	return Sanctions.DateLongue(quand) .. ", " .. tonumber(os.date("%H", quand)) .. " h " .. os.date("%M", quand)
+local function heure(quand)
+	return tonumber(os.date("%H", quand)) .. " h " .. os.date("%M", quand)
 end
 
-function Sanctions.Jours(n)
-	return n .. (n > 1 and " jours" or " jour")
+function Sanctions.DateHeure(quand)
+	return Sanctions.DateLongue(quand) .. ", " .. heure(quand)
+end
+
+--- Sans l'année : une fin de bannissement tombe presque toujours dans l'année qui court.
+function Sanctions.DateHeureCourte(quand)
+	return dateCourte(quand) .. ", " .. heure(quand)
 end
 
 -- Ce que l'état écrit à droite, sa couleur, et le liseré de gauche des états qui pèsent encore.
@@ -55,7 +60,7 @@ local function libelleEtat(dossier, etat, echeance)
 	elseif (etat == "avertissement") then
 		return "Avertissement"
 	elseif (etat == "termine") then
-		return "Terminé · " .. Sanctions.Jours(dossier.jours or 0)
+		return "Terminé le " .. dateCourte(dossier.fin or dossier.debut or 0)
 	elseif (etat == "leve") then
 		return "Levé"
 	end
@@ -70,7 +75,7 @@ local function decrireSanction(etat)
 		return "bannissement définitif"
 	end
 
-	return "bannissement de " .. Sanctions.Jours(etat.jours or 0)
+	return "bannissement jusqu'au " .. Sanctions.DateHeureCourte(tonumber(etat.fin) or 0)
 end
 
 local function decrireModification(avant, apres)
@@ -82,8 +87,9 @@ local function decrireModification(avant, apres)
 
 	if (avant.sanction != apres.sanction) then
 		changes[#changes + 1] = decrireSanction(avant) .. " → " .. decrireSanction(apres)
-	elseif (apres.sanction == "temporaire" and avant.jours != apres.jours) then
-		changes[#changes + 1] = "durée " .. (avant.jours or 0) .. " → " .. Sanctions.Jours(apres.jours or 0)
+	elseif (apres.sanction == "temporaire" and avant.fin != apres.fin) then
+		changes[#changes + 1] = "fin " .. Sanctions.DateHeureCourte(tonumber(avant.fin) or 0) .. " → "
+			.. Sanctions.DateHeureCourte(tonumber(apres.fin) or 0)
 	end
 
 	if (avant.texte != apres.texte) then
@@ -99,7 +105,7 @@ local VERBES = {creation = "Posé par ", modification = "Modifié par ", annulat
 --- Le journal ne garde que des diffs : on remonte du dossier actuel en défaisant chaque modification, ce qui rend
 --- l'état d'avant et d'après de chaque entrée, création comprise.
 local function entreesJournal(dossier)
-	local apres = {type = dossier.type, texte = dossier.texte, sanction = dossier.sanction, jours = dossier.jours}
+	local apres = {type = dossier.type, texte = dossier.texte, sanction = dossier.sanction, fin = dossier.fin}
 	local journal = dossier.journal or {}
 	local entrees = {}
 

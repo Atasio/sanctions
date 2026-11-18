@@ -88,14 +88,14 @@ return {
 			"Dossier : la ligne, ses trois entrées et le personnage du compte (" .. #complet.personnages .. " perso)")
 
 		local ancien = attendre(function(fin)
-			Sanctions.Creer(acteur, CIBLE, {type = "freekill", texte = "Ancien", sanction = "temporaire", jours = 3, debut = os.time() - 10 * Sanctions.JOUR}, fin)
+			Sanctions.Creer(acteur, CIBLE, {type = "freekill", texte = "Ancien", sanction = "temporaire", fin = os.time() - 7 * Sanctions.JOUR, debut = os.time() - 10 * Sanctions.JOUR}, fin)
 		end)
 
-		local refusDuree = attendre(function(fin) Sanctions.Modifier(acteur, ancien.id, {jours = 30}, fin) end)
+		local refusDuree = attendre(function(fin) Sanctions.Modifier(acteur, ancien.id, {fin = os.time() + 30 * Sanctions.JOUR}, fin) end)
 		local okTexte = attendre(function(fin) Sanctions.Modifier(acteur, ancien.id, {texte = "Ancien, corrigé", type = "autre"}, fin) end)
 		relu = attendre(function(fin) Sanctions.Lire(ancien.id, fin) end)
 
-		Banc.Verifier(6, !refusDuree and okTexte and relu.jours == 3 and relu.type == "autre",
-			"terminé : durée refusée, type et texte corrigés (jours " .. tostring(relu and relu.jours) .. ")")
+		Banc.Verifier(6, !refusDuree and okTexte and relu.fin == ancien.fin and relu.type == "autre",
+			"terminé : fin refusée, type et texte corrigés (fin " .. tostring(relu and relu.fin) .. " / " .. tostring(ancien.fin) .. ")")
 	end
 }

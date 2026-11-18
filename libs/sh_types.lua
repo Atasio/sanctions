@@ -39,17 +39,16 @@ for _, sanction in ipairs(Sanctions.SANCTIONS) do
 	Sanctions.SANCTION[sanction.id] = true
 end
 
+Sanctions.JOUR = 86400
+
 -- PLACEHOLDERS.
 Sanctions.TEXTE_MAX = 1000
-Sanctions.JOURS_MIN = 1
-Sanctions.JOURS_MAX = 3650
-
-Sanctions.JOUR = 86400
+Sanctions.FIN_MAX = 3650 * Sanctions.JOUR
 
 Sanctions.NET = {agir = "sanctionsAgir", dossier = "sanctionsDossier", refus = "sanctionsRefus"}
 
 -- Les champs que `Modifier` envoie, dans l'ordre du message ; chacun précédé d'un booléen « présent ».
-Sanctions.CHAMPS_MODIFIABLES = {"type", "texte", "sanction", "jours"}
+Sanctions.CHAMPS_MODIFIABLES = {"type", "texte", "sanction", "fin"}
 
 ---@class SanctionDossier
 ---@field id integer
@@ -57,7 +56,7 @@ Sanctions.CHAMPS_MODIFIABLES = {"type", "texte", "sanction", "jours"}
 ---@field type string
 ---@field texte string
 ---@field sanction SanctionKind
----@field jours integer?
+---@field fin integer? échéance d'un temporaire
 ---@field debut integer
 ---@field levee_le integer?
 ---@field auteur_steamid64 string
@@ -89,7 +88,21 @@ end
 function Sanctions.Echeance(dossier)
 	if (dossier.sanction != "temporaire") then return end
 
-	return dossier.debut + (dossier.jours or 0) * Sanctions.JOUR
+	return dossier.fin
+end
+
+--- La borne d'une fin de bannissement, des deux côtés : le serveur refuse avec, l'écran éteint son verbe avec.
+---@param fin any
+---@param maintenant integer
+---@return string? raison
+function Sanctions.ErreurFin(fin, maintenant)
+	if (!isnumber(fin) or fin != math.floor(fin)) then
+		return "Date de fin invalide."
+	elseif (fin <= maintenant) then
+		return "La fin est déjà passée."
+	elseif (fin > maintenant + Sanctions.FIN_MAX) then
+		return "La fin dépasse " .. Sanctions.FIN_MAX / Sanctions.JOUR .. " jours."
+	end
 end
 
 ---@param dossier SanctionDossier
