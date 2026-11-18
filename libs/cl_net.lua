@@ -61,6 +61,7 @@ end
 ---@field dossiers SanctionDossier[] chacun porte `.journal`
 ---@field personnages {id: integer, nom: string}[]
 ---@field peutGerer boolean
+---@field mien boolean? réponse à `Mien`, que la fenêtre staff ignore
 
 hook.Add("InitializedPlugins", "sanctionsNet", function()
 	net.Receive(Sanctions.NET.dossier, function()

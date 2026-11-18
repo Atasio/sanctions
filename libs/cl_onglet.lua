@@ -17,20 +17,6 @@ local function theme()
 	return VALDERAAN.MenuTheme
 end
 
-local function styleScroll(scroll)
-	local bar = scroll:GetVBar()
-
-	bar:SetWide(K.Scale(6))
-	bar:SetHideButtons(true)
-
-	function bar:Paint() end
-
-	function bar.btnGrip:Paint(width, height)
-		surface.SetDrawColor(theme().col.lineSoft)
-		surface.DrawRect(0, 0, width, height)
-	end
-end
-
 local function ligneTexte(parent, texte, role, hauteur)
 	local panel = parent:Add("Panel")
 
@@ -51,7 +37,7 @@ local function construire(container)
 	page.corps = page:Add("DScrollPanel")
 	page.corps:Dock(FILL)
 	page.corps:DockMargin(0, K.Scale(14), 0, 0)
-	styleScroll(page.corps)
+	Sanctions.Defilement(page.corps)
 
 	return page
 end
@@ -106,7 +92,8 @@ local function creation(nom, t)
 	return {action = "creation", quand = t, auteur_nom = nom}
 end
 
-local function dossiersEssai()
+--- Partagées avec la vue de la fenêtre staff : les deux maquettes montrent le même dossier.
+function Sanctions.DossiersEssai()
 	return {
 		{id = 4, type = "freekill", sanction = "temporaire", jours = 3, debut = quand(17, 11, 21, 4), cree_le = quand(17, 11, 21, 4),
 			auteur_nom = "Elrond", annulee = false, journal = {creation("Elrond", quand(17, 11, 21, 4))},
@@ -132,6 +119,6 @@ K.Vue("sanctions_liste", {782, 760}, function(parent, data)
 	remplir(construire(parent), data.dossiers, data.options)
 end, {
 	vide = function() return {dossiers = {}} end,
-	quatre = function() return {dossiers = dossiersEssai(), options = {survol = 2}} end,
-	deplie = function() return {dossiers = dossiersEssai(), options = {survol = 2, deplie = 2}} end
+	quatre = function() return {dossiers = Sanctions.DossiersEssai(), options = {survol = 2}} end,
+	deplie = function() return {dossiers = Sanctions.DossiersEssai(), options = {survol = 2, deplie = 2}} end
 })

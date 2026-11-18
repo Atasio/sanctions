@@ -33,7 +33,7 @@ function Sanctions.DateHeure(quand)
 	return Sanctions.DateLongue(quand) .. ", " .. tonumber(os.date("%H", quand)) .. " h " .. os.date("%M", quand)
 end
 
-local function jours(n)
+function Sanctions.Jours(n)
 	return n .. (n > 1 and " jours" or " jour")
 end
 
@@ -55,7 +55,7 @@ local function libelleEtat(dossier, etat, echeance)
 	elseif (etat == "avertissement") then
 		return "Avertissement"
 	elseif (etat == "termine") then
-		return "Terminé · " .. jours(dossier.jours or 0)
+		return "Terminé · " .. Sanctions.Jours(dossier.jours or 0)
 	elseif (etat == "leve") then
 		return "Levé"
 	end
@@ -70,7 +70,7 @@ local function decrireSanction(etat)
 		return "bannissement définitif"
 	end
 
-	return "bannissement de " .. jours(etat.jours or 0)
+	return "bannissement de " .. Sanctions.Jours(etat.jours or 0)
 end
 
 local function decrireModification(avant, apres)
@@ -83,7 +83,7 @@ local function decrireModification(avant, apres)
 	if (avant.sanction != apres.sanction) then
 		changes[#changes + 1] = decrireSanction(avant) .. " → " .. decrireSanction(apres)
 	elseif (apres.sanction == "temporaire" and avant.jours != apres.jours) then
-		changes[#changes + 1] = "durée " .. (avant.jours or 0) .. " → " .. jours(apres.jours or 0)
+		changes[#changes + 1] = "durée " .. (avant.jours or 0) .. " → " .. Sanctions.Jours(apres.jours or 0)
 	end
 
 	if (avant.texte != apres.texte) then
@@ -155,6 +155,15 @@ local function couper(texte, police, largeur)
 	return lignes
 end
 
+-- Un moteur de police n'a pas d'interlettrage : `SelectKit` (schema) pose les lettres une à une.
+function Sanctions.Espacer(texte, police, espace)
+	return VALDERAAN.SelectKit.Track(texte, police, K.Scale(espace))
+end
+
+function Sanctions.PoserEspace(trace, police, x, cy, couleur, aDroite)
+	VALDERAAN.SelectKit.DrawTracked(trace, police, aDroite and x - trace.width or x, math.Round(cy - trace.height / 2), couleur)
+end
+
 local function barrer(x, cy, largeur, couleur)
 	surface.SetDrawColor(couleur)
 	surface.DrawRect(x, cy, largeur, 1)
@@ -170,7 +179,7 @@ local function paintLigne(row, width, height)
 
 	if (row.etat != etat) then
 		row.etat = etat
-		row.libelleEtat = theme().upper(libelleEtat(dossier, etat, echeance))
+		row.libelleEtat = Sanctions.Espacer(theme().upper(libelleEtat(dossier, etat, echeance)), K.Role("micro"), 3)
 	end
 
 	if (row.deplie) then
@@ -187,9 +196,9 @@ local function paintLigne(row, width, height)
 	local titre = style.eteint and col.text3 or col.textTitle
 	local texte = style.barre_texte and col.text3 or col.textNotes
 
-	draw.SimpleText(row.titre, K.Role("heading"), gauche, S(24), titre, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+	Sanctions.PoserEspace(row.titreEspace, K.Role("heading"), gauche, S(24), titre)
 	draw.SimpleText(row.texteCourt or "", K.Role("smallIt"), gauche, S(50), texte, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-	draw.SimpleText(row.libelleEtat, K.Role("micro"), droite, S(23), col[style.encre], TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+	Sanctions.PoserEspace(row.libelleEtat, K.Role("micro"), droite, S(23), col[style.encre], true)
 	draw.SimpleText(row.date, K.Role("small"), droite, S(50), texte, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 
 	if (style.barre_texte) then
@@ -204,8 +213,8 @@ local function layoutLigne(row, width)
 	row.texteCourt = K.Fit(string.gsub(row.dossier.texte or "", "%s+", " "), K.Role("smallIt"), largeur)
 	surface.SetFont(K.Role("smallIt"))
 	row.largeurTexte = surface.GetTextSize(row.texteCourt)
-	surface.SetFont(K.Role("heading"))
-	row.largeurTitre = surface.GetTextSize(row.titre)
+	row.titreEspace = Sanctions.Espacer(row.titre, K.Role("heading"), 1)
+	row.largeurTitre = row.titreEspace.width
 end
 
 local function paintDepli(depli, width, height)
@@ -224,7 +233,7 @@ local function paintDepli(depli, width, height)
 		local cy = y + S(14)
 		local x = S(200)
 
-		draw.SimpleText(entree.quand, K.Role("micro"), S(20), cy, col.text2, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+		Sanctions.PoserEspace(entree.quandEspace, K.Role("micro"), S(20), cy, col.text2)
 		x = x + draw.SimpleText(entree.prefixe, K.Role("small"), x, cy, col.textNotes, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 		x = x + draw.SimpleText(entree.nom, K.Role("small"), x, cy, col.text1, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 		draw.SimpleText(entree.suiteCourte or "", K.Role("small"), x, cy, col.textNotes, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
@@ -241,6 +250,8 @@ local function layoutDepli(depli, width)
 	surface.SetFont(K.Role("small"))
 
 	for _, entree in ipairs(depli.entrees) do
+		entree.quandEspace = Sanctions.Espacer(entree.quand, K.Role("micro"), 2)
+
 		local debut = S(200) + surface.GetTextSize(entree.prefixe .. entree.nom)
 
 		entree.suiteCourte = K.Fit(entree.suite, K.Role("small"), width - debut - S(16))
@@ -266,6 +277,22 @@ local function ajouterActions(row, options)
 	modifier:DockMargin(0, 0, K.Scale(4), 0)
 	boutons:SetWide(annuler:GetWide() + modifier:GetWide() + K.Scale(4))
 	row.marge = boutons:GetWide() + K.Scale(24)
+end
+
+--- La barre de défilement des deux écrans : un filet, sans boutons.
+---@param scroll DScrollPanel
+function Sanctions.Defilement(scroll)
+	local bar = scroll:GetVBar()
+
+	bar:SetWide(K.Scale(6))
+	bar:SetHideButtons(true)
+
+	function bar:Paint() end
+
+	function bar.btnGrip:Paint(width, height)
+		surface.SetDrawColor(theme().col.lineSoft)
+		surface.DrawRect(0, 0, width, height)
+	end
 end
 
 ---@class SanctionsListeOptions

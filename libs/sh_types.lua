@@ -28,7 +28,16 @@ for _, infraction in ipairs(Sanctions.TYPES) do
 end
 
 ---@alias SanctionKind "aucune"|"temporaire"|"definitive"
-Sanctions.SANCTION = {aucune = true, temporaire = true, definitive = true}
+Sanctions.SANCTIONS = {
+	{id = "aucune", libelle = "Avertissement seul"},
+	{id = "temporaire", libelle = "Bannissement temporaire"},
+	{id = "definitive", libelle = "Bannissement définitif"}
+}
+Sanctions.SANCTION = {}
+
+for _, sanction in ipairs(Sanctions.SANCTIONS) do
+	Sanctions.SANCTION[sanction.id] = true
+end
 
 -- PLACEHOLDERS.
 Sanctions.TEXTE_MAX = 1000

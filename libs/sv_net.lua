@@ -122,8 +122,9 @@ local function refuser(client, raison)
 	Sanctions.Repondre(client, "refus", raison or "Action refusée.")
 end
 
---- Le journal voyage dans chaque ligne : JSON perdrait les clés numériques d'une table indexée par id.
-local function envoyerDossier(client, steamid64)
+--- Le journal voyage dans chaque ligne : JSON perdrait les clés numériques d'une table indexée par id. `mien` dit à
+--- l'écran que c'est la réponse à `Mien` : un staff a `peutGerer` aussi sur son propre onglet.
+local function envoyerDossier(client, steamid64, mien)
 	Sanctions.Dossier(steamid64, function(complet)
 		if (!IsValid(client)) then return end
 
@@ -149,7 +150,8 @@ local function envoyerDossier(client, steamid64)
 			nomSteam = IsValid(joueur) and joueur:SteamName() or nil,
 			dossiers = complet.dossiers,
 			personnages = complet.personnages,
-			peutGerer = peutGerer
+			peutGerer = peutGerer,
+			mien = mien or nil
 		})
 	end)
 end
@@ -175,7 +177,7 @@ function Sanctions.Recevoir(client, action, intention)
 	end
 
 	if (action == "Mien") then
-		return envoyerDossier(client, client:SteamID64())
+		return envoyerDossier(client, client:SteamID64(), true)
 	end
 
 	if (!Sanctions.PeutGerer(client)) then
