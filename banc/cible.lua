@@ -46,6 +46,8 @@ return {
 			inscrite = inscrite or commande.cmd == "ulx sanctions"
 		end
 
-		Banc.Verifier(3, inscrite and ULib.ucl.accessStrings["ulx sanctions"] != nil, "!sanctions inscrite dans ULX, accès enregistré")
+		-- PeutGerer est remplacé dans ce scénario : seul ce constat voit le privilège que lit le vrai, côté CAMI.
+		Banc.Verifier(3, inscrite and ULib.ucl.accessStrings["ulx sanctions"] != nil and CAMI.GetPrivilege("ulx sanctions") != nil,
+			"!sanctions inscrite dans ULX, accès enregistré dans ULX et CAMI")
 	end
 }

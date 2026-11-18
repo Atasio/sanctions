@@ -10,6 +10,11 @@ VALDERAAN.Sanctions = VALDERAAN.Sanctions or {}
 
 local Sanctions = VALDERAAN.Sanctions
 
+-- ⚠️ `ulx.command` n'inscrit pas son accès dans CAMI, qui refuse tout privilège inconnu, superadmin compris.
+if (CAMI) then
+	CAMI.RegisterPrivilege({Name = "ulx sanctions", MinAccess = "admin", Description = "Dossiers de sanctions des comptes."})
+end
+
 --- Le seul lecteur du droit du plugin. `nil` est la console ; tout joueur invalide est refusé.
 ---@param client Player?
 function Sanctions.PeutGerer(client)
