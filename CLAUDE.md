@@ -28,11 +28,20 @@ l'archi et l'état. Spec : `docs/dev/specs/2026-11-17-sanctions-design.md` ; rep
 | `libs/sv_base.lua` | tables `val_sanctions` et `val_sanctions_journal`, `Sanctions.Ecrire` (seule écriture, journal compris), `Creer`, `Modifier`, `Annuler`, `Lever`, `Lire`, `Dossier` |
 | `libs/sv_ulib.lua` | `Sanctions.Appliquer` (seul appelant de `ULib.addBan` / `unban`, sous garde), rattrapage des ban / unban hors interface, remplacement de l'actif |
 | `libs/sv_net.lua` | `Sanctions.Recevoir` (débit, droit, forme, puis `sv_base`), `Repondre` ; canaux dans `Sanctions.NET` |
+| `libs/cl_net.lua` | `Sanctions.Agir(action, intention)`, miroir exact de `LIRE` (`sv_net.lua`) ; les réponses partent en hooks `SanctionsDossier` / `SanctionsRefus` (un refus qu'aucun écran ne prend devient une notification) |
+| `libs/cl_liste.lua` | `Sanctions.Liste(parent, dossiers, options)`, la liste partagée des deux écrans (dépli sur le journal, actions en callback) ; `DateLongue`, `DateHeure` |
+| `libs/cl_onglet.lua` | l'onglet `sanctions` du menu TAB (lecture seule, `Mien`) et la vue de capture `sanctions_liste` |
 | `banc/etat.lua` | la formule d'état sur des dossiers factices |
 | `banc/base.lua` | dossiers et journal sur un faux compte |
 | `banc/ulib.lua` | application, remplacement et rattrapage sur des faux comptes |
 | `banc/refus.lua` | refus de la porte réseau : droit, bornes, débit, `Mien` |
 | `banc/cible.lua` | résolution de cible de `!sanctions`, filtre du menu C, inscription ULX |
+
+## Le client
+
+Les `cl_` de `libs/` chargent avant les `sh_` : `NET`, `Etat`, `Libelle` s'y lisent au runtime, et les récepteurs
+réseau se posent à `InitializedPlugins`. Le journal ne garde que des diffs : `cl_liste` reconstruit l'état d'avant
+chaque entrée en remontant du dossier actuel, création comprise.
 
 ## Modèle de données
 
@@ -47,4 +56,4 @@ n'a jamais d'accès ULib (garde de `schema/libs/sv_banc_bot.lua`) : un scénario
 
 ## État
 
-Chantier en cours (tâche 5 sur 10). Toutes les bornes sont des placeholders.
+Chantier en cours (tâche 7 sur 10). Toutes les bornes sont des placeholders.
