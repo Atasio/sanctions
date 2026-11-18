@@ -222,6 +222,86 @@ function Sanctions.DossiersDe(steamid64, callback)
 	query:Execute()
 end
 
+-- ⚠️ `%` et `_` sont des jokers de LIKE : un joueur qui tape « % » ferait rendre tout le journal. `!` les neutralise, et
+-- la clause ESCAPE se glisse dans le format, que l'enveloppe `mysql` place avant son guillemet fermant (SQLite et MySQL).
+local function pourLike(texte)
+	return (string.gsub(texte, "[!%%_]", "!%0"))
+end
+
+local function whereContient(query, colonne, texte)
+	query:WhereLike(colonne, pourLike(texte), "%%%s%%' ESCAPE '!")
+end
+
+local function enSteamID64(texte)
+	if (Sanctions.EstSteamID64(texte)) then return texte end
+
+	if (string.match(texte, "^STEAM_%d:%d:%d+$")) then
+		local converti = util.SteamIDTo64(texte)
+
+		return Sanctions.EstSteamID64(converti) and converti or nil
+	end
+end
+
+---@class SanctionFiltres
+---@field sanction ""|"avertissement"|"bannissement"
+---@field type string "" pour tous
+---@field moderateur string SteamID ou SteamID64 exact, sinon sous-chaîne du nom
+---@field compte string SteamID ou SteamID64 exact, sinon sous-chaîne du nom de personnage
+---@field avant integer id du dernier dossier déjà reçu, 0 pour la première page
+
+--- Une page du journal général, du plus récent au plus ancien. Le curseur est l'`id` : un décalage ou une date
+--- dupliquerait ou perdrait une ligne quand un dossier s'écrit entre deux pages. Lecture seule.
+---@param filtres SanctionFiltres
+---@param callback fun(dossiers: SanctionDossier[], suite: boolean)
+function Sanctions.Journal(filtres, callback)
+	local taille = Sanctions.PAGE_JOURNAL
+	local query = mysql:Select("val_sanctions")
+		query:OrderByDesc("id")
+		query:Limit(taille + 1)
+
+		if (filtres.avant > 0) then query:WhereLT("id", filtres.avant) end
+		if (filtres.type != "") then query:Where("type", filtres.type) end
+
+		if (filtres.sanction == "avertissement") then
+			query:Where("sanction", "aucune")
+		elseif (filtres.sanction == "bannissement") then
+			query:WhereIn("sanction", {"temporaire", "definitive"})
+		end
+
+		if (filtres.moderateur != "") then
+			local auteur = enSteamID64(filtres.moderateur)
+
+			if (auteur) then
+				query:Where("auteur_steamid64", auteur)
+			else
+				whereContient(query, "auteur_nom", filtres.moderateur)
+			end
+		end
+
+		if (filtres.compte != "") then
+			local steamid64 = enSteamID64(filtres.compte)
+
+			if (steamid64) then
+				query:Where("steamid64", steamid64)
+			else
+				whereContient(query, "perso_nom", filtres.compte)
+			end
+		end
+
+		query:Callback(function(rows)
+			rows = istable(rows) and rows or {}
+
+			local dossiers = {}
+
+			for i = 1, math.min(#rows, taille) do
+				dossiers[i] = versDossier(rows[i])
+			end
+
+			callback(dossiers, #rows > taille)
+		end)
+	query:Execute()
+end
+
 ---@param cible64 string
 ---@param champs {type: string, texte: string, sanction: SanctionKind, fin: integer?, debut: integer?}
 ---@param callback fun(dossier: SanctionDossier?, raison: string?)?

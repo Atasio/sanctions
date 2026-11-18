@@ -26,7 +26,7 @@ l'archi et l'état. Spec : `docs/dev/specs/2026-11-17-sanctions-design.md` ; rep
 | `sh_plugin.lua` | déclaration |
 | `libs/sh_commande.lua` | `Sanctions.PeutGerer` (seul lecteur du droit, des deux côtés), commande `!sanctions`, `ResoudreCible`, entrée `sanctions` du menu C |
 | `libs/sh_types.lua` | types d'infraction et sanctions (ids persistés), bornes, `ErreurFin`, `Etat`, `Libelle`, `EstSteamID64`, noms des canaux |
-| `libs/sv_base.lua` | tables `val_sanctions` et `val_sanctions_journal`, `Sanctions.Ecrire` (seule écriture, journal compris), `Creer`, `Modifier`, `Annuler`, `Lever`, `Lire`, `Dossier` |
+| `libs/sv_base.lua` | tables `val_sanctions` et `val_sanctions_journal`, `Sanctions.Ecrire` (seule écriture, journal compris), `Creer`, `Modifier`, `Annuler`, `Lever`, `Lire`, `Dossier`, `Journal` (une page du journal général, curseur sur l'`id`) |
 | `libs/sv_ulib.lua` | `Sanctions.Appliquer` (seul appelant de `ULib.addBan` / `unban`, sous garde), rattrapage des ban / unban hors interface, remplacement de l'actif |
 | `libs/sv_net.lua` | `Sanctions.Recevoir` (débit, droit, forme, puis `sv_base`), `Repondre` ; canaux dans `Sanctions.NET` |
 | `libs/cl_net.lua` | `Sanctions.Agir(action, intention)`, miroir exact de `LIRE` (`sv_net.lua`) ; les réponses partent en hooks `SanctionsDossier` / `SanctionsRefus` (un refus qu'aucun écran ne prend devient une notification) |
@@ -37,6 +37,7 @@ l'archi et l'état. Spec : `docs/dev/specs/2026-11-17-sanctions-design.md` ; rep
 | `banc/base.lua` | dossiers et journal sur un faux compte |
 | `banc/ulib.lua` | application, remplacement et rattrapage sur des faux comptes |
 | `banc/refus.lua` | refus de la porte réseau : droit, bornes, débit, `Mien` |
+| `banc/journal.lua` | le journal général : ordre, filtres, pagination, refus, lecture seule, taille, injection |
 | `banc/cible.lua` | résolution de cible de `!sanctions`, filtre du menu C, inscription ULX |
 
 ## Le client

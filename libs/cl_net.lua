@@ -2,7 +2,7 @@
 	cl_net.lua — Le côté client du réseau : `Sanctions.Agir` écrit une intention, les réponses partent en hooks.
 
 	Le client n'envoie qu'une intention, dans l'ordre exact de la table `LIRE` de sv_net.lua. Un écran ne reçoit que
-	par `SanctionsDossier` / `SanctionsRefus`, et vérifie lui-même que le dossier reçu est celui qu'il montre.
+	par `SanctionsDossier` / `SanctionsJournal` / `SanctionsRefus`, et vérifie lui-même que le dossier reçu est celui qu'il montre.
 --]]
 
 VALDERAAN = VALDERAAN or {}
@@ -14,6 +14,13 @@ local Sanctions = VALDERAAN.Sanctions
 local ECRIRE = {
 	Ouvrir = function(intention) net.WriteString(intention.steamid64) end,
 	Mien = function() end,
+	Journal = function(intention)
+		net.WriteString(intention.sanction or "")
+		net.WriteString(intention.type or "")
+		net.WriteString(intention.moderateur or "")
+		net.WriteString(intention.compte or "")
+		net.WriteUInt(intention.avant or 0, 32)
+	end,
 	Creer = function(intention)
 		net.WriteString(intention.steamid64)
 		net.WriteString(intention.type)
@@ -41,7 +48,7 @@ local ECRIRE = {
 	Annuler = function(intention) net.WriteUInt(intention.id, 32) end
 }
 
----@param action "Ouvrir"|"Mien"|"Creer"|"Modifier"|"Annuler"
+---@param action "Ouvrir"|"Mien"|"Journal"|"Creer"|"Modifier"|"Annuler"
 ---@param intention table?
 function Sanctions.Agir(action, intention)
 	-- Une erreur d'écriture laisserait le message ouvert : le suivant serait refusé par le moteur.
@@ -54,6 +61,11 @@ function Sanctions.Agir(action, intention)
 		ECRIRE[action](intention or {})
 	net.SendToServer()
 end
+
+---@class SanctionsJournalRecu
+---@field dossiers SanctionDossier[]
+---@field suite boolean
+---@field avant integer le curseur de la requête, 0 pour une première page
 
 ---@class SanctionsDossierRecu
 ---@field steamid64 string
@@ -70,6 +82,15 @@ hook.Add("InitializedPlugins", "sanctionsNet", function()
 
 		if (istable(recu)) then
 			hook.Run("SanctionsDossier", recu)
+		end
+	end)
+
+	net.Receive(Sanctions.NET.journal, function()
+		local taille = net.ReadUInt(32)
+		local recu = util.JSONToTable(util.Decompress(net.ReadData(taille)) or "")
+
+		if (istable(recu)) then
+			hook.Run("SanctionsJournal", recu)
 		end
 	end)
 

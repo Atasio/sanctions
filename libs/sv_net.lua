@@ -18,6 +18,9 @@ local ECRITURES = {Creer = true, Modifier = true, Annuler = true}
 local INTERVALLE_ECRITURE = 1
 local INTERVALLE_LECTURE = 0.5
 
+-- PLACEHOLDER, sous la limite de 64 Ko d'un message.
+local TAILLE_MAX = 60000
+
 local derniers = {}
 
 local function debit(client, ecriture)
@@ -92,7 +95,7 @@ end
 
 --- Les réponses passent par ici ; le banc la remplace pour lire ce qu'un client aurait reçu.
 ---@param client Player
----@param genre "dossier"|"refus"
+---@param genre "dossier"|"journal"|"refus"
 ---@param contenu table|string
 function Sanctions.Repondre(client, genre, contenu)
 	if (genre == "refus") then
@@ -101,12 +104,11 @@ function Sanctions.Repondre(client, genre, contenu)
 
 	local compresse = util.Compress(util.TableToJSON(contenu))
 
-	-- PLACEHOLDER, sous la limite de 64 Ko d'un message.
-	if (#compresse > 60000) then
-		return Sanctions.Repondre(client, "refus", "Dossier trop volumineux pour être envoyé.")
+	if (#compresse > TAILLE_MAX) then
+		return Sanctions.Repondre(client, "refus", "Réponse trop volumineuse pour être envoyée.")
 	end
 
-	envoyer(client, NET.dossier, function()
+	envoyer(client, NET[genre], function()
 		net.WriteUInt(#compresse, 32)
 		net.WriteData(compresse, #compresse)
 	end)
@@ -157,12 +159,36 @@ local function apresEcriture(client, dossier, raison)
 	envoyerDossier(client, dossier.steamid64)
 end
 
----@alias SanctionAction "Ouvrir"|"Mien"|"Creer"|"Modifier"|"Annuler"
+local FILTRES_SANCTION = {[""] = true, avertissement = true, bannissement = true}
+
+--- Rend les filtres du journal nettoyés, ou nil et la raison.
+local function validerFiltres(intention)
+	local propre = {}
+
+	for _, cle in ipairs({"moderateur", "compte"}) do
+		local texte = intention[cle]
+		local longueur = isstring(texte) and utf8.len(texte)
+
+		if (!longueur or longueur > Sanctions.FILTRE_MAX) then return nil, "Filtre invalide." end
+
+		propre[cle] = string.Trim(texte)
+	end
+
+	if (!FILTRES_SANCTION[intention.sanction]) then return nil, "Sanction inconnue." end
+	if (intention.type != "" and !Sanctions.EstType(intention.type)) then return nil, "Type d'infraction inconnu." end
+	if (!isnumber(intention.avant) or intention.avant < 0 or intention.avant % 1 != 0) then return nil, "Page invalide." end
+
+	propre.sanction, propre.type, propre.avant = intention.sanction, intention.type, intention.avant
+
+	return propre
+end
+
+---@alias SanctionAction "Ouvrir"|"Mien"|"Journal"|"Creer"|"Modifier"|"Annuler"
 
 --- Une intention déjà lue du réseau (ou fabriquée par le banc). Rien n'y est cru : tout est revalidé ici.
 ---@param client Player
 ---@param action SanctionAction
----@param intention {steamid64: string?, id: integer?, type: string?, texte: string?, sanction: string?, fin: integer?}
+---@param intention {steamid64: string?, id: integer?, type: string?, texte: string?, sanction: string?, fin: integer?, moderateur: string?, compte: string?, avant: integer?}
 function Sanctions.Recevoir(client, action, intention)
 	if (!IsValid(client)) then return end
 
@@ -180,7 +206,24 @@ function Sanctions.Recevoir(client, action, intention)
 
 	local acteur = Sanctions.Acteur(client)
 
-	if (action == "Ouvrir") then
+	if (action == "Journal") then
+		local filtres, raison = validerFiltres(intention)
+
+		if (!filtres) then return refuser(client, raison) end
+
+		Sanctions.Journal(filtres, function(dossiers, suite)
+			if (!IsValid(client)) then return end
+
+			-- Des textes peu compressibles (UTF-8 multi-octets) font dépasser la page : on la raccourcit, et le curseur
+			-- par id reprend au dernier dossier envoyé.
+			while (#dossiers > 1 and #util.Compress(util.TableToJSON({dossiers = dossiers, suite = suite, avant = filtres.avant})) > TAILLE_MAX) do
+				dossiers[#dossiers] = nil
+				suite = true
+			end
+
+			Sanctions.Repondre(client, "journal", {dossiers = dossiers, suite = suite, avant = filtres.avant})
+		end)
+	elseif (action == "Ouvrir") then
 		if (!Sanctions.EstSteamID64(intention.steamid64)) then return refuser(client, "Compte invalide.") end
 
 		envoyerDossier(client, intention.steamid64)
@@ -219,6 +262,12 @@ end
 local LIRE = {
 	Ouvrir = function() return {steamid64 = net.ReadString()} end,
 	Mien = function() return {} end,
+	Journal = function()
+		return {
+			sanction = net.ReadString(), type = net.ReadString(), moderateur = net.ReadString(),
+			compte = net.ReadString(), avant = net.ReadUInt(32)
+		}
+	end,
 	Creer = function()
 		return {
 			steamid64 = net.ReadString(), type = net.ReadString(), texte = net.ReadString(),

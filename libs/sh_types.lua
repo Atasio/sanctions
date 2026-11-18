@@ -45,7 +45,11 @@ Sanctions.JOUR = 86400
 Sanctions.TEXTE_MAX = 1000
 Sanctions.FIN_MAX = 3650 * Sanctions.JOUR
 
-Sanctions.NET = {agir = "sanctionsAgir", dossier = "sanctionsDossier", refus = "sanctionsRefus"}
+Sanctions.NET = {agir = "sanctionsAgir", dossier = "sanctionsDossier", journal = "sanctionsJournal", refus = "sanctionsRefus"}
+
+-- PLACEHOLDERS : la taille d'une page du journal et la longueur d'un filtre texte.
+Sanctions.PAGE_JOURNAL = 50
+Sanctions.FILTRE_MAX = 64
 
 -- Les champs que `Modifier` envoie, dans l'ordre du message ; chacun précédé d'un booléen « présent ».
 Sanctions.CHAMPS_MODIFIABLES = {"type", "texte", "sanction", "fin"}
