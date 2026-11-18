@@ -287,8 +287,24 @@ function Sanctions.Liste(parent, dossiers, options)
 
 	liste:Dock(TOP)
 
-	function liste:PerformLayout()
+	-- Les déplis prennent leur hauteur ICI, avant la mesure : un passage de mise en page suffit. Un panneau peint à la main
+	-- (capture `valderaan_ui`) n'exécute pas les InvalidateLayout différés.
+	function liste:PerformLayout(width)
+		local avant = self:GetTall()
+
+		for _, enfant in ipairs(self:GetChildren()) do
+			if (enfant.entrees) then
+				layoutDepli(enfant, width)
+			end
+		end
+
 		self:SizeToChildren(false, true)
+
+		-- Dans un DScrollPanel, le parent est le canevas : c'est le panneau de défilement qui le redimensionne.
+		if (self:GetTall() != avant) then
+			self:GetParent():InvalidateLayout()
+			self:GetParent():GetParent():InvalidateLayout()
+		end
 	end
 
 	for rang, dossier in ipairs(dossiers) do
@@ -323,7 +339,6 @@ function Sanctions.Liste(parent, dossiers, options)
 			self.deplie = !self.deplie
 			depli:SetVisible(self.deplie)
 			liste:InvalidateLayout()
-			liste:GetParent():InvalidateLayout()
 		end
 	end
 
