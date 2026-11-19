@@ -60,4 +60,4 @@ n'a jamais d'accès ULib (garde de `schema/libs/sv_banc_bot.lua`) : un scénario
 
 ## État
 
-Chantier en cours (tâche 14 sur 14 écrite ; restent le constat en jeu à un joueur et la séance à deux joueurs, tâche 10). Toutes les bornes sont des placeholders.
+Journal général et fenêtre staff vus en jeu à un joueur ; reste la séance à deux joueurs (menu C sur un vrai joueur, droit du groupe `moderation`). Toutes les bornes sont des placeholders.
